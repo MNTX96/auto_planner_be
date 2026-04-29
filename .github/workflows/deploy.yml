@@ -1,0 +1,54 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Run tests & deploy
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD:  ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF:           ${{ secrets.SUPABASE_PROJECT_REF }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      # ── Database ──────────────────────────────────────────
+      - name: Run database migrations
+        run: supabase db push
+
+      # ── Edge Functions ────────────────────────────────────
+      - name: Deploy save-plan function
+        run: supabase functions deploy save-plan --no-verify-jwt
+
+      - name: Deploy update-task-status function
+        run: supabase functions deploy update-task-status --no-verify-jwt
+
+      - name: Deploy regenerate-plan function
+        run: supabase functions deploy regenerate-plan --no-verify-jwt
+
+      # ── Types ─────────────────────────────────────────────
+      - name: Generate TypeScript types
+        run: |
+          supabase gen types typescript --project-id "$PROJECT_REF" \
+            > supabase/types/database.types.ts
+
+      - name: Commit updated types (if changed)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: regenerate database types [skip ci]"
+          file_pattern: supabase/types/database.types.ts

@@ -1,0 +1,28 @@
+# Supabase
+supabase/.branches
+supabase/.temp
+supabase/functions/.cache
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code & MCP config (contain project refs, local tool settings)
+.claude/
+.gemini/
+.mcp.json
+
+# Node (if any tooling added later)
+node_modules/
