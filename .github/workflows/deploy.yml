@@ -39,6 +39,7 @@ jobs:
       # ── Types ─────────────────────────────────────────────
       - name: Generate TypeScript types
         run: |
+          mkdir -p supabase/types
           supabase gen types typescript --project-id "$PROJECT_REF" \
             > supabase/types/database.types.ts
 
