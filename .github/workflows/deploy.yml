@@ -32,14 +32,9 @@ jobs:
         run: supabase db push
 
       # ── Edge Functions ────────────────────────────────────
-      - name: Deploy save-plan function
-        run: supabase functions deploy save-plan --no-verify-jwt
-
-      - name: Deploy update-task-status function
-        run: supabase functions deploy update-task-status --no-verify-jwt
-
-      - name: Deploy regenerate-plan function
-        run: supabase functions deploy regenerate-plan --no-verify-jwt
+      # Deploys all functions under supabase/functions/ automatically
+      - name: Deploy all edge functions
+        run: supabase functions deploy --no-verify-jwt
 
       # ── Types ─────────────────────────────────────────────
       - name: Generate TypeScript types
