@@ -10,6 +10,9 @@ jobs:
     name: Run tests & deploy
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # required for git-auto-commit-action to push types back
+
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD:  ${{ secrets.SUPABASE_DB_PASSWORD }}
