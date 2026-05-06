@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const raw = await callVertexGemini(SYSTEM_PROMPT, body.prompt, 'gemini-2.0-flash-001', 1024);
+    const raw = await callVertexGemini(SYSTEM_PROMPT, body.prompt, 'gemini-2.5-flash', 1024);
     const analysis = JSON.parse(raw);
 
     return new Response(JSON.stringify(analysis), {

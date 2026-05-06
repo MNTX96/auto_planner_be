@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
       vars.prompt_constraints ? `Constraints: ${vars.prompt_constraints}` : null,
     ].filter(Boolean).join('\n');
 
-    const raw = await callVertexGemini(SYSTEM_PROMPT, contextLines, 'gemini-2.0-flash-001', 4096);
+    const raw = await callVertexGemini(SYSTEM_PROMPT, contextLines, 'gemini-2.5-flash', 4096);
     const planJson = JSON.parse(raw);
 
     return new Response(JSON.stringify(planJson), {
