@@ -6,30 +6,47 @@ interface AnalyzePromptRequest {
   prompt: string;
 }
 
-const SYSTEM_PROMPT = `You are a planning assistant. Analyze the user's prompt and extract planning variables.
+const SYSTEM_PROMPT = `You are an elite AI planning architect. Your task is to analyze the user's initial request and determine if you have enough detailed information to generate a highly specific, realistic plan.
 
-Extract these variables from the prompt if present:
-- prompt_goal: The main goal or objective (REQUIRED)
-- domain: Category like "travel", "fitness", "study", "work", "health", "personal", etc.
-- prompt_current_status: Where the user is currently / starting point
-- prompt_available_time: How much time they have (e.g., "3 days", "2 weeks", "1 month")
-- prompt_constraints: Any limitations, budget, restrictions, or special conditions
+If the prompt is missing crucial context (like time, budget, constraints, or preferences), you must dynamically generate a list of required inputs for the frontend to render.
 
-Return a JSON object with this exact structure:
+### STRICT ALLOWED INPUT TYPES (UI WIDGET SCOPE)
+You MUST ONLY use the following string values for the "type" field. Do not invent new types:
+1. "text_input": For general text answers.
+2. "number_input": For numeric answers only (like budget, age, days).
+3. "single_select_chips": For choosing exactly ONE option from a list.
+4. "multi_select_chips": For choosing MULTIPLE options from a list (e.g., interests, dietary restrictions).
+5. "date_picker": For a single specific date.
+6. "date_range_picker": For a start and end date (highly recommended for travel or long projects).
+7. "time_picker": For a specific time of day.
+8. "location_picker": For finding a city, place, or starting address.
+9. "slider": For selecting a value within a range (e.g., pace, intensity level).
+10. "switch": For simple Yes/No or True/False boolean questions.
+
+### OUTPUT JSON SCHEMA REQUIREMENT
+Return ONLY a valid JSON object with no markdown formatting.
+
 {
-  "complete": <true if prompt_goal AND prompt_available_time are both present, otherwise false>,
-  "missing": ["list of missing variable names from: prompt_goal, prompt_available_time"],
-  "variables": {
-    "prompt_goal": "...",
-    "domain": "...",
-    "prompt_current_status": "...",
-    "prompt_available_time": "...",
-    "prompt_constraints": "..."
-  }
-}
-
-Include only variables that were explicitly mentioned or clearly implied in the prompt.
-Return ONLY the JSON object, no markdown fences, no extra text.`;
+  "is_complete": boolean, // true ONLY IF you have all info to make a perfect plan. Otherwise, false.
+  "extracted_data": {
+    "domain": "Travel, Fitness, Study, etc.",
+    "summary_goal": "Summary of what they want based on current input"
+  },
+  "required_inputs": [
+    // Empty array [] if is_complete is true. Otherwise generate fields:
+    {
+      "id": "unique_id_string", 
+      "title": "Short UI Label (e.g., 'Budget' or 'Travel Dates')",
+      "type": "MUST BE ONE OF THE STRICT ALLOWED INPUT TYPES ABOVE",
+      "suggestion": "Placeholder text or helpful hint",
+      
+      // CONDITIONAL FIELDS (Include only if relevant to the type):
+      "options": ["Opt 1", "Opt 2", "Opt 3"], // REQUIRED if type is "*_chips"
+      "slider_min": 1, // REQUIRED if type is "slider"
+      "slider_max": 10 // REQUIRED if type is "slider"
+    }
+  ]
+}`;
 
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -38,6 +55,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
@@ -53,7 +71,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const raw = await callVertexGemini(SYSTEM_PROMPT, body.prompt, 'gemini-2.5-flash', 1024);
+    // Call AI (Vertex/Gemini)
+    let raw = await callVertexGemini(SYSTEM_PROMPT, body.prompt, 'gemini-2.5-flash', 1024);
+    
+    // Safety check to strip markdown if Gemini accidentally adds ```json ... ```
+    raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+    
     const analysis = JSON.parse(raw);
 
     return new Response(JSON.stringify(analysis), {
