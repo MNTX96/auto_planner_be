@@ -19,6 +19,8 @@ interface MilestoneInput {
 
 interface SavePlanRequest {
   domain?: string;
+  original_prompt?: string;
+  answers?: Record<string, unknown>;
   prompt_goal: string;
   prompt_current_status?: string;
   prompt_available_time?: string;

@@ -2,60 +2,64 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { callVertexGemini } from '../_shared/vertex.ts';
 
+function localeToLanguage(locale: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(locale) ?? 'English';
+  } catch {
+    return 'English';
+  }
+}
+
+// 1. Giao diện nhận data mới: Khớp với Dynamic UI
 interface GeneratePlanRequest {
-  variables: {
-    prompt_goal: string;
-    domain?: string;
-    prompt_current_status?: string;
-    prompt_available_time?: string;
-    prompt_constraints?: string;
-    [key: string]: string | undefined;
-  };
-  user_id?: string; // ignored — user identity comes from auth JWT
+  original_prompt: string;
+  answers: Record<string, any>; // Chứa các câu trả lời động (VD: { "budget": 5000, "date": "2024-10-10" })
 }
 
 const SYSTEM_PROMPT = `You are an expert planning assistant. Generate a detailed, actionable plan.
 
-Return a JSON object with this EXACT structure (no markdown, no extra text):
+### INPUT CONTEXT:
+You will receive a JSON payload containing:
+1. "original_prompt": The user's initial idea.
+2. "answers": Specific details, constraints, and preferences gathered from the user.
+You MUST strictly obey all constraints provided in the "answers".
+
+### OUTPUT SCHEMA (STRICT JSON ONLY, NO MARKDOWN):
 {
-  "prompt_goal": "the user's main goal",
-  "domain": "category of the plan",
-  "prompt_current_status": "current status if provided",
-  "prompt_available_time": "available time if provided",
-  "prompt_constraints": "constraints if provided",
-  "title": "concise plan title (max 60 chars)",
-  "ultimate_goal": "inspiring ultimate outcome statement",
-  "total_duration": "human-readable total duration (e.g. '3 days', '2 weeks')",
-  "success_metrics": ["measurable success criterion 1", "measurable success criterion 2", "measurable success criterion 3"],
+  "prompt_goal": "Summary of the user's main goal",
+  "domain": "Category (e.g., travel, fitness, study)",
+  "title": "Concise plan title (max 60 chars)",
+  "ultimate_goal": "Inspiring ultimate outcome statement",
+  "total_duration": "Human-readable total duration (e.g., '3 days', '2 weeks')",
+  "success_metrics": ["Measurable criterion 1", "Measurable criterion 2"],
   "expert_advice": {
-    "tips": ["actionable tip 1", "actionable tip 2", "actionable tip 3"],
-    "warnings": ["potential pitfall 1", "potential pitfall 2"]
+    "tips": ["Actionable tip 1", "Actionable tip 2"],
+    "warnings": ["Potential pitfall based on their constraints"]
   },
   "milestones": [
     {
       "milestone_index": 1,
-      "name": "Phase/Day name (e.g. 'Day 1: Preparation')",
-      "focus_objective": "theme or focus for this milestone",
+      "name": "Phase/Day name (e.g., 'Day 1: Preparation')",
+      "focus_objective": "Theme or focus for this milestone",
       "tasks": [
         {
           "task_index": 1,
-          "name": "specific actionable task name",
-          "task_time": "suggested time like '09:00 AM'",
+          "name": "Specific actionable task name",
+          "task_time": "Suggested time like '09:00 AM' or 'Anytime'",
           "duration_minutes": 30,
-          "resources_or_location": "what you need or where to go",
-          "details": "brief instructions or tips for this task"
+          "resources_or_location": "What you need or where to go",
+          "details": "Brief instructions or tips for this task"
         }
       ]
     }
   ]
 }
 
-Rules:
-- Break the plan into logical milestones based on the available time
-- Each milestone must have 3–6 concrete tasks
-- milestone_index starts at 1, task_index restarts at 1 per milestone
-- Be specific and actionable
-- Return ONLY the JSON object`;
+### RULES:
+- Break the plan into logical milestones based on the timeframe in the "answers".
+- Each milestone must have 2–6 concrete tasks.
+- milestone_index starts at 1, task_index restarts at 1 per milestone.
+- Return ONLY the JSON object.`;
 
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -72,24 +76,36 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: GeneratePlanRequest = await req.json();
-    const vars = body.variables ?? {};
 
-    if (!vars.prompt_goal?.trim()) {
-      return new Response(JSON.stringify({ error: 'variables.prompt_goal is required' }), {
+    if (!body.original_prompt?.trim()) {
+      return new Response(JSON.stringify({ error: 'original_prompt is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const contextLines = [
-      `Goal: ${vars.prompt_goal}`,
-      vars.domain ? `Domain: ${vars.domain}` : null,
-      vars.prompt_current_status ? `Current status: ${vars.prompt_current_status}` : null,
-      vars.prompt_available_time ? `Available time: ${vars.prompt_available_time}` : null,
-      vars.prompt_constraints ? `Constraints: ${vars.prompt_constraints}` : null,
-    ].filter(Boolean).join('\n');
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('locale')
+      .eq('id', user.id)
+      .single();
 
-    const raw = await callVertexGemini(SYSTEM_PROMPT, contextLines, 'gemini-2.5-flash', 4096);
+    const language = localeToLanguage(profile?.locale ?? 'en');
+    const systemPrompt =
+      SYSTEM_PROMPT +
+      `\n\n### LANGUAGE REQUIREMENT\nYou MUST write all text values in the JSON output in ${language}. Do not use any other language.`;
+
+    // 2. Tự động đóng gói Input thành JSON để đưa cho AI
+    const inputForAI = JSON.stringify({
+      original_prompt: body.original_prompt,
+      answers: body.answers ?? {}
+    });
+
+    // 3. Gọi Gemini
+    let raw = await callVertexGemini(systemPrompt, inputForAI, 'gemini-2.5-flash', 4096);
+    
+    // 4. Clean up Markdown an toàn
+    raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const planJson = JSON.parse(raw);
 
     return new Response(JSON.stringify(planJson), {
