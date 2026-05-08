@@ -6,6 +6,14 @@ interface AnalyzePromptRequest {
   prompt: string;
 }
 
+function localeToLanguage(locale: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(locale) ?? 'English';
+  } catch {
+    return 'English';
+  }
+}
+
 const SYSTEM_PROMPT = `You are an elite AI planning architect. Your task is to analyze the user's initial request and determine if you have enough detailed information to generate a highly specific, realistic plan.
 
 If the prompt is missing crucial context (like time, budget, constraints, or preferences), you must dynamically generate a list of required inputs for the frontend to render.
@@ -71,8 +79,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('locale')
+      .eq('id', user.id)
+      .single();
+
+    const language = localeToLanguage(profile?.locale ?? 'en');
+    const systemPrompt =
+      SYSTEM_PROMPT +
+      `\n\n### LANGUAGE REQUIREMENT\nYou MUST write all text values in the JSON output (title, suggestion, options, summary_goal) in ${language}. Do not use any other language.`;
+
     // Call AI (Vertex/Gemini)
-    let raw = await callVertexGemini(SYSTEM_PROMPT, body.prompt, 'gemini-2.5-flash', 2048);
+    let raw = await callVertexGemini(systemPrompt, body.prompt, 'gemini-2.5-flash', 2048);
     
     // Safety check to strip markdown if Gemini accidentally adds ```json ... ```
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
