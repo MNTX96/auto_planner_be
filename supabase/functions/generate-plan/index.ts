@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // 3. Gọi Gemini
-    let raw = await callVertexGemini(systemPrompt, inputForAI, 'gemini-2.5-flash', 4096);
+    let raw = await callVertexGemini(systemPrompt, inputForAI, 'gemini-2.5-flash', 8192);
     
     // 4. Clean up Markdown an toàn
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
