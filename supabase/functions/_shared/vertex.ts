@@ -122,6 +122,10 @@ export async function callVertexGemini(
   }
 
   const data = await res.json();
-  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new Error(`Vertex AI response was truncated (MAX_TOKENS). Increase maxOutputTokens.`);
+  }
+  const text: string = candidate?.content?.parts?.[0]?.text ?? '{}';
   return text;
 }
