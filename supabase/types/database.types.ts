@@ -57,10 +57,12 @@ export type Database = {
       }
       plans: {
         Row: {
+          answers: Json | null
           created_at: string
           domain: string | null
           expert_advice: Json
           id: string
+          original_prompt: string | null
           progress_percentage: number
           prompt_available_time: string | null
           prompt_constraints: string | null
@@ -75,10 +77,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          answers?: Json | null
           created_at?: string
           domain?: string | null
           expert_advice?: Json
           id?: string
+          original_prompt?: string | null
           progress_percentage?: number
           prompt_available_time?: string | null
           prompt_constraints?: string | null
@@ -93,10 +97,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          answers?: Json | null
           created_at?: string
           domain?: string | null
           expert_advice?: Json
           id?: string
+          original_prompt?: string | null
           progress_percentage?: number
           prompt_available_time?: string | null
           prompt_constraints?: string | null
