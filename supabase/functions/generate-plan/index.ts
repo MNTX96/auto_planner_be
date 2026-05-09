@@ -27,10 +27,10 @@ You MUST strictly obey all constraints provided in the "answers".
 
 ### OUTPUT SCHEMA (STRICT JSON ONLY, NO MARKDOWN):
 {
-  "prompt_goal": "Summary of the user's main goal",
+  "prompt_goal": "A direct, action-oriented statement of the goal. Start with a verb. DO NOT use narrator phrases like 'The user wants to...' or 'Người dùng muốn...'. Example: 'Tiết kiệm $3,000 trong 6 tháng'",
   "domain": "MUST BE EXACTLY ONE OF THESE ENGLISH WORDS:['Travel', 'Study', 'Fitness', 'Health', 'Food', 'Finance', 'Career', 'Event', 'Shopping', 'Home', 'Family', 'Hobby', 'Project', 'Pets', 'Lifestyle', 'Social', 'Content', 'Other']. Evaluate the prompt and pick the most suitable category. NEVER translate this word to the user's language.",
   "title": "Concise plan title (max 60 chars)",
-  "ultimate_goal": "Inspiring ultimate outcome statement",
+ "ultimate_goal": "A direct, inspiring outcome statement. DO NOT use 'Người dùng sẽ...'. Example: 'Sở hữu quỹ dự phòng vững chắc và tự do tài chính'",
   "total_duration": "Human-readable total duration (e.g., '3 days', '2 weeks')",
   "success_metrics": ["Measurable criterion 1", "Measurable criterion 2"],
   "expert_advice": {
@@ -60,6 +60,7 @@ You MUST strictly obey all constraints provided in the "answers".
 - Break the plan into logical milestones based on the timeframe in the "answers".
 - Each milestone must have 2–6 concrete tasks.
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
+- DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases like "Người dùng muốn", "Kế hoạch này giúp", or "The user wants to". Start goals and tasks directly with action verbs (e.g., "Tiết kiệm...", "Học...", "Chạy...").
 - duration_minutes MUST be a positive integer ≥ 1. Never output 0 — use the best estimated value.
 - Return ONLY the JSON object.`;
 
