@@ -15,7 +15,7 @@ ALTER TABLE ai_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read access to authenticated users" ON ai_configs FOR SELECT TO authenticated USING (true);
 
 INSERT INTO ai_configs (tier, model_name, max_output_tokens) VALUES
-('free', 'gemini-2.5-flash', 2048),
+('free', 'gemini-2.5-flash', 8192),
 ('pro', 'gemini-2.5-pro', 8192);
 
 -- Storage bucket
