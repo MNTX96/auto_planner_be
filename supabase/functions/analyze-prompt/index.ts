@@ -19,13 +19,15 @@ const SYSTEM_PROMPT = `You are an elite AI planning architect. Your task is to a
 
 ### THE 4 CORE PILLARS & QUALITY CRITERIA
 To set "is_complete" to true, the user's input MUST cover these 4 pillars, and the data MUST be Specific and Measurable:
+1. [Goal & Scope]: What is the exact objective? (e.g., "Lose 5kg" is acceptable, but "Get fit" is too vague).
+2.[Context & Baseline]: What is the starting point? Who is involved?
+3. [Resources]: What is the available capital? (Available Time/Dates, Budget, Tools).
+4. [Constraints & Risks]: What are the hard boundaries? (Allergies, non-negotiable deadlines, preferences).
 
-1. [Goal & Scope]: What is the exact objective? (e.g., "Lose 5kg" is acceptable, but "Get fit" is too vague. Must clarify the success metric).
-2.[Context & Baseline]: What is the starting point? Who is involved? (e.g., Solo trip or family? Beginner or advanced?).
-3. [Resources]: What is the available capital? (This includes exact Available Time/Dates, Budget, and Tools/Equipment).
-4. [Constraints & Risks]: What are the hard boundaries? (e.g., Allergies, injuries, non-negotiable deadlines, things they hate/want to avoid).
-
-If the prompt is missing details in ANY of these 4 pillars, OR if the provided information is too vague/unmeasurable, you MUST generate "required_inputs" to clarify.
+### SINGLE RESPONSIBILITY RULE FOR INPUTS (CRITICAL)
+If you generate "required_inputs", each item in the array MUST ask for ONE and ONLY ONE specific piece of information. DO NOT combine multiple questions into a single input field.
+- ❌ BAD: "What is your budget and travel dates?" (Combined)
+- ✅ GOOD: Create 2 separate items: One for "Budget" (number_input) and one for "Travel Dates" (date_range_picker).
 
 ### STRICT ALLOWED INPUT TYPES (UI WIDGET SCOPE)
 1. "text_input": General text answers.
@@ -52,10 +54,10 @@ Return ONLY a valid JSON object with no markdown formatting.
     // Empty array [] if is_complete is true. Otherwise generate fields:
     {
       "id": "unique_id_string", 
-      "title": "Short UI Label (e.g., 'Target Weight' or 'Budget Limit')",
+      "title": "Short UI Label (Must focus on ONE specific information only)",
       "type": "MUST BE ONE OF THE STRICT ALLOWED INPUT TYPES",
       "pillar_category": "MUST BE ONE OF: 'Goal_Scope', 'Context', 'Resources', 'Constraints_Risks'", 
-      "is_required": boolean, // true if the plan CANNOT be made without this info. false if it's optional.
+      "is_required": boolean, 
       "suggestion": "Placeholder text or helpful hint",
       "options":["Opt 1", "Opt 2"], // REQUIRED if type is "*_chips"
       "slider_min": 1, // REQUIRED if type is "slider"
