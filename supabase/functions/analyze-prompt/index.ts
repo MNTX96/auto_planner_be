@@ -47,7 +47,7 @@ Return ONLY a valid JSON object with no markdown formatting.
 {
   "is_complete": boolean, // true ONLY IF all 4 Pillars are fully satisfied AND are specific/measurable.
   "extracted_data": {
-    "domain": "Travel, Fitness, Study, Project, etc.",
+    "domain": "MUST BE EXACTLY ONE OF THESE ENGLISH WORDS:['Travel', 'Study', 'Fitness', 'Health', 'Food', 'Finance', 'Career', 'Event', 'Shopping', 'Home', 'Family', 'Hobby', 'Project', 'Pets', 'Lifestyle', 'Social', 'Content', 'Other']. Evaluate the prompt and pick the most suitable category. NEVER translate this word to the user's language.",
     "summary_goal": "Summary of what they want based on current input"
   },
   "required_inputs":[

@@ -28,7 +28,7 @@ You MUST strictly obey all constraints provided in the "answers".
 ### OUTPUT SCHEMA (STRICT JSON ONLY, NO MARKDOWN):
 {
   "prompt_goal": "Summary of the user's main goal",
-  "domain": "Category (e.g., travel, fitness, study)",
+  "domain": "MUST BE EXACTLY ONE OF THESE ENGLISH WORDS:['Travel', 'Study', 'Fitness', 'Health', 'Food', 'Finance', 'Career', 'Event', 'Shopping', 'Home', 'Family', 'Hobby', 'Project', 'Pets', 'Lifestyle', 'Social', 'Content', 'Other']. Evaluate the prompt and pick the most suitable category. NEVER translate this word to the user's language.",
   "title": "Concise plan title (max 60 chars)",
   "ultimate_goal": "Inspiring ultimate outcome statement",
   "total_duration": "Human-readable total duration (e.g., '3 days', '2 weeks')",
