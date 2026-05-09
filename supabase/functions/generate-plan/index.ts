@@ -60,6 +60,7 @@ You MUST strictly obey all constraints provided in the "answers".
 - Break the plan into logical milestones based on the timeframe in the "answers".
 - Each milestone must have 2–6 concrete tasks.
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
+- duration_minutes MUST be a positive integer ≥ 1. Never output 0 — use the best estimated value.
 - Return ONLY the JSON object.`;
 
 Deno.serve(async (req: Request) => {
