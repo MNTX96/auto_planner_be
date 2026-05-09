@@ -1,6 +1,6 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
-import { callVertexGemini } from '../_shared/vertex.ts';
+import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
 
 function localeToLanguage(locale: string): string {
   try {
@@ -14,6 +14,7 @@ function localeToLanguage(locale: string): string {
 interface GeneratePlanRequest {
   original_prompt: string;
   answers: Record<string, any>; // Chứa các câu trả lời động (VD: { "budget": 5000, "date": "2024-10-10" })
+  files?: string[];
 }
 
 const SYSTEM_PROMPT = `You are an expert planning assistant. Generate a detailed, actionable plan.
@@ -86,11 +87,22 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('locale')
+      .select('locale, tier')
       .eq('id', user.id)
       .single();
 
     const language = localeToLanguage(profile?.locale ?? 'en');
+    const tier = profile?.tier ?? 'free';
+
+    const { data: config } = await supabase
+      .from('ai_configs')
+      .select('model_name, max_output_tokens')
+      .eq('tier', tier)
+      .single();
+
+    const modelName = config?.model_name ?? 'gemini-2.5-flash';
+    const maxOutputTokens = config?.max_output_tokens ?? 8192;
+    
     const systemPrompt =
       SYSTEM_PROMPT +
       `\n\n### LANGUAGE REQUIREMENT\nYou MUST write all text values in the JSON output in ${language}. Do not use any other language.`;
@@ -101,8 +113,28 @@ Deno.serve(async (req: Request) => {
       answers: body.answers ?? {}
     });
 
+    const parts: VertexPart[] = [];
+    if (body.files && body.files.length > 0) {
+      for (const filePath of body.files) {
+        const { data, error } = await supabase.storage.from('prompt_attachments').download(filePath);
+        if (data) {
+          const buffer = await data.arrayBuffer();
+          const base64 = arrayBufferToBase64(buffer);
+          parts.push({
+            inlineData: {
+              mimeType: data.type,
+              data: base64,
+            },
+          });
+        } else {
+          console.error(`Failed to download ${filePath}:`, error);
+        }
+      }
+    }
+    parts.push({ text: inputForAI });
+
     // 3. Gọi Gemini
-    let raw = await callVertexGemini(systemPrompt, inputForAI, 'gemini-2.5-flash', 8192);
+    let raw = await callVertexGemini(systemPrompt, parts, modelName, maxOutputTokens);
     
     // 4. Clean up Markdown an toàn
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();

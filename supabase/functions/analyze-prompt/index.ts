@@ -1,9 +1,10 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
-import { callVertexGemini } from '../_shared/vertex.ts';
+import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
 
 interface AnalyzePromptRequest {
   prompt: string;
+  files?: string[];
 }
 
 function localeToLanguage(locale: string): string {
@@ -88,18 +89,48 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('locale')
+      .select('locale, tier')
       .eq('id', user.id)
       .single();
 
     const language = localeToLanguage(profile?.locale ?? 'en');
+    const tier = profile?.tier ?? 'free';
+
+    const { data: config } = await supabase
+      .from('ai_configs')
+      .select('model_name, max_output_tokens')
+      .eq('tier', tier)
+      .single();
+
+    const modelName = config?.model_name ?? 'gemini-2.5-flash';
+    const maxOutputTokens = config?.max_output_tokens ?? 2048;
     
     const systemPrompt =
       SYSTEM_PROMPT +
       `\n\n### LANGUAGE REQUIREMENT\nYou MUST write all user-facing text values in the JSON output (\`title\`, \`suggestion\`, \`options\` arrays, \`summary_goal\`) in ${language}. Do NOT translate system keys like \`type\`, \`pillar_category\`, or \`id\`.`;
 
+    const parts: VertexPart[] = [];
+    if (body.files && body.files.length > 0) {
+      for (const filePath of body.files) {
+        const { data, error } = await supabase.storage.from('prompt_attachments').download(filePath);
+        if (data) {
+          const buffer = await data.arrayBuffer();
+          const base64 = arrayBufferToBase64(buffer);
+          parts.push({
+            inlineData: {
+              mimeType: data.type,
+              data: base64,
+            },
+          });
+        } else {
+          console.error(`Failed to download ${filePath}:`, error);
+        }
+      }
+    }
+    parts.push({ text: body.prompt });
+
     // Call AI (Vertex/Gemini)
-    let raw = await callVertexGemini(systemPrompt, body.prompt, 'gemini-2.5-flash', 2048);
+    let raw = await callVertexGemini(systemPrompt, parts, modelName, maxOutputTokens);
     
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const analysis = JSON.parse(raw);

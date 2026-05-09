@@ -80,15 +80,32 @@ export async function getVertexAccessToken(): Promise<{ token: string; projectId
   return { token: data.access_token as string, projectId: sa.project_id };
 }
 
+export interface VertexPart {
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
+}
+
 export interface VertexMessage {
   role: 'user' | 'model';
-  parts: Array<{ text: string }>;
+  parts: VertexPart[];
+}
+
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 export async function callVertexGemini(
   systemInstruction: string,
-  userMessage: string,
-  model = 'gemini-2.0-flash-001',
+  userMessage: string | VertexPart[],
+  model = 'gemini-2.5-flash',
   maxOutputTokens = 2048,
 ): Promise<string> {
   const location = Deno.env.get('VERTEX_AI_LOCATION') ?? 'us-central1';
@@ -97,9 +114,13 @@ export async function callVertexGemini(
   const endpoint =
     `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
+  const userParts = typeof userMessage === 'string' 
+    ? [{ text: userMessage }] 
+    : userMessage;
+
   const body = {
     systemInstruction: { parts: [{ text: systemInstruction }] },
-    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    contents: [{ role: 'user', parts: userParts }],
     generationConfig: {
       maxOutputTokens,
       temperature: 0.7,
