@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_configs: {
+        Row: {
+          created_at: string
+          id: string
+          max_output_tokens: number
+          model_name: string
+          tier: Database["public"]["Enums"]["tier_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_output_tokens: number
+          model_name: string
+          tier: Database["public"]["Enums"]["tier_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_output_tokens?: number
+          model_name?: string
+          tier?: Database["public"]["Enums"]["tier_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       milestones: {
         Row: {
           created_at: string
@@ -135,6 +162,7 @@ export type Database = {
           id: string
           locale: string
           theme_mode: number
+          tier: Database["public"]["Enums"]["tier_type"]
         }
         Insert: {
           avatar_url?: string | null
@@ -144,6 +172,7 @@ export type Database = {
           id: string
           locale?: string
           theme_mode?: number
+          tier?: Database["public"]["Enums"]["tier_type"]
         }
         Update: {
           avatar_url?: string | null
@@ -153,6 +182,7 @@ export type Database = {
           id?: string
           locale?: string
           theme_mode?: number
+          tier?: Database["public"]["Enums"]["tier_type"]
         }
         Relationships: []
       }
@@ -219,6 +249,7 @@ export type Database = {
     Enums: {
       plan_status: "active" | "completed" | "abandoned"
       task_status: "pending" | "in_progress" | "completed" | "missed"
+      tier_type: "free" | "pro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -348,6 +379,7 @@ export const Constants = {
     Enums: {
       plan_status: ["active", "completed", "abandoned"],
       task_status: ["pending", "in_progress", "completed", "missed"],
+      tier_type: ["free", "pro"],
     },
   },
 } as const
