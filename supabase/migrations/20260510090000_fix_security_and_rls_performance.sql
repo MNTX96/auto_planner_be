@@ -25,26 +25,26 @@ DROP POLICY IF EXISTS "task_delete_own" ON task;
 -- ============================================================
 
 -- profile
-CREATE POLICY "profile_select_own" ON profile FOR SELECT USING ((SELECT auth.uid()) = id);
-CREATE POLICY "profile_update_own" ON profile FOR UPDATE USING ((SELECT auth.uid()) = id) WITH CHECK ((SELECT auth.uid()) = id);
+CREATE POLICY "profile_select_own" ON profile FOR SELECT TO authenticated USING ((SELECT auth.uid()) = id);
+CREATE POLICY "profile_update_own" ON profile FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = id) WITH CHECK ((SELECT auth.uid()) = id);
 
 -- plan
-CREATE POLICY "plan_select_own" ON plan FOR SELECT USING ((SELECT auth.uid()) = user_id);
-CREATE POLICY "plan_insert_own" ON plan FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY "plan_update_own" ON plan FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
-CREATE POLICY "plan_delete_own" ON plan FOR DELETE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "plan_select_own" ON plan FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "plan_insert_own" ON plan FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "plan_update_own" ON plan FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "plan_delete_own" ON plan FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
 
 -- milestone
-CREATE POLICY "milestone_select_own" ON milestone FOR SELECT USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "milestone_insert_own" ON milestone FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "milestone_update_own" ON milestone FOR UPDATE USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid()))) WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "milestone_delete_own" ON milestone FOR DELETE USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "milestone_select_own" ON milestone FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "milestone_insert_own" ON milestone FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "milestone_update_own" ON milestone FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid()))) WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "milestone_delete_own" ON milestone FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = (SELECT auth.uid())));
 
 -- task
-CREATE POLICY "task_select_own" ON task FOR SELECT USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "task_insert_own" ON task FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "task_update_own" ON task FOR UPDATE USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid()))) WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
-CREATE POLICY "task_delete_own" ON task FOR DELETE USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "task_select_own" ON task FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "task_insert_own" ON task FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "task_update_own" ON task FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid()))) WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
+CREATE POLICY "task_delete_own" ON task FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = (SELECT auth.uid())));
 
 
 -- ============================================================
