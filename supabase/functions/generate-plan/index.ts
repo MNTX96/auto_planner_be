@@ -1,7 +1,8 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
-import { rrulestr } from 'npm:rrule';
+import pkg from 'npm:rrule';
+const { rrulestr } = pkg;
 
 function localeToLanguage(locale: string): string {
   try {
