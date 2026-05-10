@@ -14,7 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_configs: {
+      ai_config: {
         Row: {
           created_at: string
           id: string
@@ -41,7 +41,7 @@ export type Database = {
         }
         Relationships: []
       }
-      milestones: {
+      milestone: {
         Row: {
           created_at: string
           focus_objective: string | null
@@ -77,12 +77,12 @@ export type Database = {
             foreignKeyName: "milestones_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
-            referencedRelation: "plans"
+            referencedRelation: "plan"
             referencedColumns: ["id"]
           },
         ]
       }
-      plans: {
+      plan: {
         Row: {
           answers: Json | null
           created_at: string
@@ -148,12 +148,12 @@ export type Database = {
             foreignKeyName: "plans_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "profile"
             referencedColumns: ["id"]
           },
         ]
       }
-      profiles: {
+      profile: {
         Row: {
           avatar_url: string | null
           created_at: string
@@ -186,7 +186,7 @@ export type Database = {
         }
         Relationships: []
       }
-      tasks: {
+      task: {
         Row: {
           completed_at: string | null
           created_at: string
@@ -234,7 +234,7 @@ export type Database = {
             foreignKeyName: "tasks_milestone_id_fkey"
             columns: ["milestone_id"]
             isOneToOne: false
-            referencedRelation: "milestones"
+            referencedRelation: "milestone"
             referencedColumns: ["id"]
           },
         ]
