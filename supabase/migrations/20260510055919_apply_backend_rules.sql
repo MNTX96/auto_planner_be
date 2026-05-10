@@ -1,0 +1,132 @@
+-- ============================================================
+-- 1. RENAME TABLES
+-- ============================================================
+ALTER TABLE profiles RENAME TO profile;
+ALTER TABLE plans RENAME TO plan;
+ALTER TABLE milestones RENAME TO milestone;
+ALTER TABLE tasks RENAME TO task;
+ALTER TABLE ai_configs RENAME TO ai_config;
+
+-- ============================================================
+-- 2. DROP OLD POLICIES
+-- ============================================================
+-- Drop old policies on the newly renamed tables
+DROP POLICY IF EXISTS "profiles_select_own" ON profile;
+DROP POLICY IF EXISTS "profiles_update_own" ON profile;
+DROP POLICY IF EXISTS "plans_all_own" ON plan;
+DROP POLICY IF EXISTS "milestones_all_own" ON milestone;
+DROP POLICY IF EXISTS "tasks_all_own" ON task;
+DROP POLICY IF EXISTS "Allow read access to authenticated users" ON ai_config;
+
+-- ============================================================
+-- 3. CREATE NEW GRANULAR RLS POLICIES
+-- ============================================================
+
+-- profile
+CREATE POLICY "profile_select_own" ON profile FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "profile_update_own" ON profile FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+-- plan
+CREATE POLICY "plan_select_own" ON plan FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "plan_insert_own" ON plan FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "plan_update_own" ON plan FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "plan_delete_own" ON plan FOR DELETE USING (auth.uid() = user_id);
+
+-- milestone
+CREATE POLICY "milestone_select_own" ON milestone FOR SELECT USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = auth.uid()));
+CREATE POLICY "milestone_insert_own" ON milestone FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = auth.uid()));
+CREATE POLICY "milestone_update_own" ON milestone FOR UPDATE USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = auth.uid()));
+CREATE POLICY "milestone_delete_own" ON milestone FOR DELETE USING (EXISTS (SELECT 1 FROM plan WHERE plan.id = milestone.plan_id AND plan.user_id = auth.uid()));
+
+-- task
+CREATE POLICY "task_select_own" ON task FOR SELECT USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = auth.uid()));
+CREATE POLICY "task_insert_own" ON task FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = auth.uid()));
+CREATE POLICY "task_update_own" ON task FOR UPDATE USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = auth.uid()));
+CREATE POLICY "task_delete_own" ON task FOR DELETE USING (EXISTS (SELECT 1 FROM milestone JOIN plan ON milestone.plan_id = plan.id WHERE task.milestone_id = milestone.id AND plan.user_id = auth.uid()));
+
+-- ai_config
+CREATE POLICY "ai_config_select_auth" ON ai_config FOR SELECT TO authenticated USING (true);
+
+-- ============================================================
+-- 4. UPDATE RPC FUNCTION
+-- ============================================================
+CREATE OR REPLACE FUNCTION save_plan_transaction(payload JSONB)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_plan_id UUID;
+  v_ms      JSONB;
+  v_task    JSONB;
+  v_ms_id   UUID;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  INSERT INTO plan (
+    user_id,
+    domain,
+    prompt_goal,
+    prompt_current_status,
+    prompt_available_time,
+    prompt_constraints,
+    title,
+    ultimate_goal,
+    total_duration,
+    success_metrics,
+    expert_advice
+  ) VALUES (
+    v_user_id,
+    payload->>'domain',
+    payload->>'prompt_goal',
+    payload->>'prompt_current_status',
+    payload->>'prompt_available_time',
+    payload->>'prompt_constraints',
+    payload->>'title',
+    payload->>'ultimate_goal',
+    payload->>'total_duration',
+    COALESCE(payload->'success_metrics', '[]'::jsonb),
+    COALESCE(payload->'expert_advice',   '{}'::jsonb)
+  )
+  RETURNING id INTO v_plan_id;
+
+  FOR v_ms IN SELECT value FROM jsonb_array_elements(payload->'milestones')
+  LOOP
+    INSERT INTO milestone (plan_id, milestone_index, name, focus_objective)
+    VALUES (
+      v_plan_id,
+      (v_ms->>'milestone_index')::INTEGER,
+      v_ms->>'name',
+      v_ms->>'focus_objective'
+    )
+    RETURNING id INTO v_ms_id;
+
+    FOR v_task IN SELECT value FROM jsonb_array_elements(v_ms->'tasks')
+    LOOP
+      INSERT INTO task (
+        milestone_id,
+        task_index,
+        task_time,
+        name,
+        duration_minutes,
+        resources_or_location,
+        details
+      ) VALUES (
+        v_ms_id,
+        (v_task->>'task_index')::INTEGER,
+        v_task->>'task_time',
+        v_task->>'name',
+        NULLIF(v_task->>'duration_minutes', '')::INTEGER,
+        v_task->>'resources_or_location',
+        v_task->>'details'
+      );
+    END LOOP;
+  END LOOP;
+
+  RETURN v_plan_id;
+END;
+$$;

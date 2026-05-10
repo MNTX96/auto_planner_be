@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
   // Update task status — triggers handle completed_at and progress recalculation
   const { error: updateError } = await supabase
-    .from('tasks')
+    .from('task')
     .update({ status: body.status })
     .eq('id', body.task_id);
 
@@ -62,17 +62,17 @@ Deno.serve(async (req: Request) => {
 
   // Fetch updated task + parent milestone + plan progress for client optimistic update
   const { data: task, error: fetchError } = await supabase
-    .from('tasks')
+    .from('task')
     .select(`
       id,
       status,
       completed_at,
       milestone_id,
-      milestones (
+      milestone (
         id,
         progress_percentage,
         plan_id,
-        plans (
+        plan (
           id,
           progress_percentage
         )
@@ -88,16 +88,16 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const milestone = Array.isArray(task.milestones) ? task.milestones[0] : task.milestones;
-  const plan = Array.isArray(milestone?.plans) ? milestone.plans[0] : milestone?.plans;
+  const milestoneData = Array.isArray(task.milestone) ? task.milestone[0] : task.milestone;
+  const planData = Array.isArray(milestoneData?.plan) ? milestoneData.plan[0] : milestoneData?.plan;
 
   return new Response(
     JSON.stringify({
       task_id: task.id,
       status: task.status,
       completed_at: task.completed_at,
-      milestone_progress: milestone?.progress_percentage ?? 0,
-      plan_progress: plan?.progress_percentage ?? 0,
+      milestone_progress: milestoneData?.progress_percentage ?? 0,
+      plan_progress: planData?.progress_percentage ?? 0,
     }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   );

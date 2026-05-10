@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('profile')
       .select('locale, tier')
       .eq('id', user.id)
       .single();
@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const tier = profile?.tier ?? 'free';
 
     const { data: config } = await supabase
-      .from('ai_configs')
+      .from('ai_config')
       .select('model_name, max_output_tokens')
       .eq('tier', tier)
       .single();

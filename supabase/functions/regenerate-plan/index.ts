@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
 
   // RLS ensures the caller owns this plan — returns 404 if not found or unauthorized
   const { data: plan, error } = await supabase
-    .from('plans')
+    .from('plan')
     .select('original_prompt, answers')
     .eq('id', body.plan_id)
     .single();
