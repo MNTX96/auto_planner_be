@@ -5,33 +5,34 @@ SELECT plan(30);
 -- ============================================================
 -- Tables exist
 -- ============================================================
-SELECT has_table('public', 'profiles',   'profiles table exists');
-SELECT has_table('public', 'plans',      'plans table exists');
-SELECT has_table('public', 'milestones', 'milestones table exists');
-SELECT has_table('public', 'tasks',      'tasks table exists');
+SELECT has_table('public', 'profile',   'profile table exists');
+SELECT has_table('public', 'plan',      'plan table exists');
+SELECT has_table('public', 'milestone', 'milestone table exists');
+SELECT has_table('public', 'task',      'task table exists');
 
 -- ============================================================
--- Columns exist on plans
+-- Columns exist on plan
 -- ============================================================
-SELECT has_column('public', 'plans', 'id',                    'plans.id exists');
-SELECT has_column('public', 'plans', 'user_id',               'plans.user_id exists');
-SELECT has_column('public', 'plans', 'prompt_goal',           'plans.prompt_goal exists');
-SELECT has_column('public', 'plans', 'success_metrics',       'plans.success_metrics exists');
-SELECT has_column('public', 'plans', 'expert_advice',         'plans.expert_advice exists');
-SELECT has_column('public', 'plans', 'progress_percentage',   'plans.progress_percentage exists');
-SELECT has_column('public', 'plans', 'updated_at',            'plans.updated_at exists');
+SELECT has_column('public', 'plan', 'id',                    'plan.id exists');
+SELECT has_column('public', 'plan', 'user_id',               'plan.user_id exists');
+SELECT has_column('public', 'plan', 'prompt_goal',           'plan.prompt_goal exists');
+SELECT has_column('public', 'plan', 'success_metrics',       'plan.success_metrics exists');
+SELECT has_column('public', 'plan', 'expert_advice',         'plan.expert_advice exists');
+SELECT has_column('public', 'plan', 'progress_percentage',   'plan.progress_percentage exists');
+SELECT has_column('public', 'plan', 'updated_at',            'plan.updated_at exists');
 
 -- ============================================================
--- Columns exist on milestones
+-- Columns exist on milestone
 -- ============================================================
-SELECT has_column('public', 'milestones', 'updated_at', 'milestones.updated_at exists');
-SELECT has_column('public', 'milestones', 'progress_percentage', 'milestones.progress_percentage exists');
+SELECT has_column('public', 'milestone', 'updated_at', 'milestone.updated_at exists');
+SELECT has_column('public', 'milestone', 'progress_percentage', 'milestone.progress_percentage exists');
 
 -- ============================================================
--- Columns exist on tasks
+-- Columns exist on task
 -- ============================================================
-SELECT has_column('public', 'tasks', 'completed_at', 'tasks.completed_at exists');
-SELECT has_column('public', 'tasks', 'status',       'tasks.status exists');
+SELECT has_column('public', 'task', 'completed_at', 'task.completed_at exists');
+SELECT has_column('public', 'task', 'status',       'task.status exists');
+SELECT has_column('public', 'task', 'scheduled_start', 'task.scheduled_start exists');
 
 -- ============================================================
 -- ENUMs have correct values
@@ -42,31 +43,32 @@ SELECT has_type('public', 'task_status', 'task_status type exists');
 -- ============================================================
 -- Indexes exist
 -- ============================================================
-SELECT has_index('public', 'plans',      'idx_plans_user_id',        'index on plans(user_id) exists');
-SELECT has_index('public', 'milestones', 'idx_milestones_plan_id',   'index on milestones(plan_id) exists');
-SELECT has_index('public', 'tasks',      'idx_tasks_milestone_id',   'index on tasks(milestone_id) exists');
+SELECT has_index('public', 'plan',      'idx_plans_user_id',        'index on plan(user_id) exists');
+SELECT has_index('public', 'milestone', 'idx_milestones_plan_id',   'index on milestone(plan_id) exists');
+SELECT has_index('public', 'task',      'idx_tasks_milestone_id',   'index on task(milestone_id) exists');
 
 -- ============================================================
 -- CHECK constraints: progress_percentage is bounded 0-100
 -- ============================================================
-SELECT col_has_check('public', 'plans',      'progress_percentage', 'plans.progress_percentage has CHECK constraint');
-SELECT col_has_check('public', 'milestones', 'progress_percentage', 'milestones.progress_percentage has CHECK constraint');
+SELECT col_has_check('public', 'plan',      'progress_percentage', 'plan.progress_percentage has CHECK constraint');
+SELECT col_has_check('public', 'milestone', 'progress_percentage', 'milestone.progress_percentage has CHECK constraint');
 
 -- ============================================================
 -- UNIQUE constraints on ordering indexes
 -- ============================================================
-SELECT col_is_unique('public', 'milestones', ARRAY['plan_id', 'milestone_index'], 'milestones(plan_id, milestone_index) is unique');
-SELECT col_is_unique('public', 'tasks',      ARRAY['milestone_id', 'task_index'],  'tasks(milestone_id, task_index) is unique');
+-- Note: milestone_index and task_index were removed in favor of absolute time
+-- SELECT col_is_unique('public', 'milestone', ARRAY['plan_id', 'milestone_index'], 'milestone(plan_id, milestone_index) is unique');
+-- SELECT col_is_unique('public', 'task',      ARRAY['milestone_id', 'task_index'],  'task(milestone_id, task_index) is unique');
 
 -- ============================================================
 -- NOT NULL constraints on key columns
 -- ============================================================
-SELECT col_not_null('public', 'plans',      'user_id',     'plans.user_id is NOT NULL');
-SELECT col_not_null('public', 'plans',      'prompt_goal', 'plans.prompt_goal is NOT NULL');
-SELECT col_not_null('public', 'milestones', 'plan_id',     'milestones.plan_id is NOT NULL');
-SELECT col_not_null('public', 'tasks',      'milestone_id','tasks.milestone_id is NOT NULL');
-SELECT col_not_null('public', 'tasks',      'name',        'tasks.name is NOT NULL');
+SELECT col_not_null('public', 'plan',      'user_id',     'plan.user_id is NOT NULL');
+SELECT col_not_null('public', 'plan',      'prompt_goal', 'plan.prompt_goal is NOT NULL');
+SELECT col_not_null('public', 'milestone', 'plan_id',     'milestone.plan_id is NOT NULL');
+SELECT col_not_null('public', 'task',      'name',        'task.name is NOT NULL');
 
 SELECT * FROM finish();
 
 ROLLBACK;
+

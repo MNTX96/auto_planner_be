@@ -54,8 +54,7 @@ END;
 $$;
 
 -- Ensure triggers are on the singular tables
-DROP TRIGGER IF EXISTS tasks_update_milestone_progress ON tasks;
-DROP TRIGGER IF EXISTS milestones_update_plan_progress ON milestones;
+
 
 DROP TRIGGER IF EXISTS tasks_update_milestone_progress ON task;
 CREATE TRIGGER tasks_update_milestone_progress

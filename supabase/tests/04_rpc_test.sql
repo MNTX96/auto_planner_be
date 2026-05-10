@@ -4,7 +4,7 @@ SELECT plan(6);
 
 -- Setup: authenticated user
 INSERT INTO auth.users (id, email) VALUES ('33333333-0000-0000-0000-000000000001', 'rpc_test@test.com');
-INSERT INTO profiles (id, email) VALUES ('33333333-0000-0000-0000-000000000001', 'rpc_test@test.com');
+INSERT INTO profile (id, email) VALUES ('33333333-0000-0000-0000-000000000001', 'rpc_test@test.com');
 
 SET LOCAL role TO authenticated;
 SET LOCAL request.jwt.claims TO '{"sub":"33333333-0000-0000-0000-000000000001"}';
@@ -16,26 +16,28 @@ DO $$
 DECLARE
   v_plan_id UUID;
   payload JSONB := '{
-    "domain": "travel",
+    "domain": "Travel",
     "prompt_goal": "Trip to Da Nang",
     "title": "Da Nang 3 Days Plan",
+    "start_date": "2026-05-10",
+    "end_date": "2026-05-12",
     "milestones": [
       {
-        "milestone_index": 1,
         "name": "Day 1",
-        "focus_objective": "Arrival",
+        "start_date": "2026-05-10",
+        "end_date": "2026-05-10",
         "tasks": [
-          {"task_index": 1, "name": "Check in hotel", "duration_minutes": 30},
-          {"task_index": 2, "name": "Dinner at My Khe", "duration_minutes": 60}
+          {"name": "Check in hotel", "scheduled_start": "2026-05-10T14:00:00Z", "scheduled_end": "2026-05-10T14:30:00Z", "duration_minutes": 30},
+          {"name": "Dinner at My Khe", "scheduled_start": "2026-05-10T18:00:00Z", "scheduled_end": "2026-05-10T19:00:00Z", "duration_minutes": 60}
         ]
       },
       {
-        "milestone_index": 2,
         "name": "Day 2",
-        "focus_objective": "Sightseeing",
+        "start_date": "2026-05-11",
+        "end_date": "2026-05-11",
         "tasks": [
-          {"task_index": 1, "name": "Ba Na Hills", "duration_minutes": 240},
-          {"task_index": 2, "name": "Dragon Bridge", "duration_minutes": 60}
+          {"name": "Ba Na Hills", "scheduled_start": "2026-05-11T08:00:00Z", "scheduled_end": "2026-05-11T12:00:00Z", "duration_minutes": 240},
+          {"name": "Dragon Bridge", "scheduled_start": "2026-05-11T20:00:00Z", "scheduled_end": "2026-05-11T21:00:00Z", "duration_minutes": 60}
         ]
       }
     ]
@@ -52,20 +54,20 @@ SELECT isnt(
 );
 
 SELECT is(
-  (SELECT COUNT(*) FROM plans WHERE id = current_setting('test.plan_id', TRUE)::UUID)::INTEGER,
+  (SELECT COUNT(*) FROM plan WHERE id = current_setting('test.plan_id', TRUE)::UUID)::INTEGER,
   1,
   'save_plan_transaction inserts exactly 1 plan row'
 );
 
 SELECT is(
-  (SELECT COUNT(*) FROM milestones WHERE plan_id = current_setting('test.plan_id', TRUE)::UUID)::INTEGER,
+  (SELECT COUNT(*) FROM milestone WHERE plan_id = current_setting('test.plan_id', TRUE)::UUID)::INTEGER,
   2,
   'save_plan_transaction inserts 2 milestone rows'
 );
 
 SELECT is(
-  (SELECT COUNT(*) FROM tasks t
-   JOIN milestones m ON t.milestone_id = m.id
+  (SELECT COUNT(*) FROM task t
+   JOIN milestone m ON t.milestone_id = m.id
    WHERE m.plan_id = current_setting('test.plan_id', TRUE)::UUID)::INTEGER,
   4,
   'save_plan_transaction inserts 4 task rows'
@@ -93,3 +95,4 @@ SELECT throws_ok(
 SELECT * FROM finish();
 
 ROLLBACK;
+
