@@ -44,32 +44,38 @@ export type Database = {
       milestone: {
         Row: {
           created_at: string
+          end_date: string | null
           focus_objective: string | null
           id: string
           milestone_index: number
           name: string
           plan_id: string
           progress_percentage: number
+          start_date: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          end_date?: string | null
           focus_objective?: string | null
           id?: string
           milestone_index: number
           name: string
           plan_id: string
           progress_percentage?: number
+          start_date?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          end_date?: string | null
           focus_objective?: string | null
           id?: string
           milestone_index?: number
           name?: string
           plan_id?: string
           progress_percentage?: number
+          start_date?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -87,6 +93,7 @@ export type Database = {
           answers: Json | null
           created_at: string
           domain: string | null
+          end_date: string | null
           expert_advice: Json
           id: string
           original_prompt: string | null
@@ -95,6 +102,7 @@ export type Database = {
           prompt_constraints: string | null
           prompt_current_status: string | null
           prompt_goal: string
+          start_date: string | null
           status: Database["public"]["Enums"]["plan_status"]
           success_metrics: Json
           title: string
@@ -107,6 +115,7 @@ export type Database = {
           answers?: Json | null
           created_at?: string
           domain?: string | null
+          end_date?: string | null
           expert_advice?: Json
           id?: string
           original_prompt?: string | null
@@ -115,6 +124,7 @@ export type Database = {
           prompt_constraints?: string | null
           prompt_current_status?: string | null
           prompt_goal: string
+          start_date?: string | null
           status?: Database["public"]["Enums"]["plan_status"]
           success_metrics?: Json
           title: string
@@ -127,6 +137,7 @@ export type Database = {
           answers?: Json | null
           created_at?: string
           domain?: string | null
+          end_date?: string | null
           expert_advice?: Json
           id?: string
           original_prompt?: string | null
@@ -135,6 +146,7 @@ export type Database = {
           prompt_constraints?: string | null
           prompt_current_status?: string | null
           prompt_goal?: string
+          start_date?: string | null
           status?: Database["public"]["Enums"]["plan_status"]
           success_metrics?: Json
           title?: string
@@ -193,13 +205,17 @@ export type Database = {
           details: string | null
           duration_minutes: number | null
           id: string
-          milestone_id: string
+          milestone_id: string | null
           name: string
           resources_or_location: string | null
+          rrule: string | null
+          scheduled_end: string | null
+          scheduled_start: string | null
           status: Database["public"]["Enums"]["task_status"]
           task_index: number
-          task_time: string | null
+          task_type: Database["public"]["Enums"]["task_type_enum"]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -207,13 +223,17 @@ export type Database = {
           details?: string | null
           duration_minutes?: number | null
           id?: string
-          milestone_id: string
+          milestone_id?: string | null
           name: string
           resources_or_location?: string | null
+          rrule?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_index: number
-          task_time?: string | null
+          task_type?: Database["public"]["Enums"]["task_type_enum"]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -221,13 +241,17 @@ export type Database = {
           details?: string | null
           duration_minutes?: number | null
           id?: string
-          milestone_id?: string
+          milestone_id?: string | null
           name?: string
           resources_or_location?: string | null
+          rrule?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_index?: number
-          task_time?: string | null
+          task_type?: Database["public"]["Enums"]["task_type_enum"]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -249,6 +273,7 @@ export type Database = {
     Enums: {
       plan_status: "active" | "completed" | "abandoned"
       task_status: "pending" | "in_progress" | "completed" | "missed"
+      task_type_enum: "ai_plan" | "manual_single" | "manual_routine"
       tier_type: "free" | "pro"
     }
     CompositeTypes: {
@@ -379,6 +404,7 @@ export const Constants = {
     Enums: {
       plan_status: ["active", "completed", "abandoned"],
       task_status: ["pending", "in_progress", "completed", "missed"],
+      task_type_enum: ["ai_plan", "manual_single", "manual_routine"],
       tier_type: ["free", "pro"],
     },
   },
