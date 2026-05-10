@@ -1,6 +1,7 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
+import { rrulestr } from 'npm:rrule';
 
 function localeToLanguage(locale: string): string {
   try {
@@ -10,43 +11,54 @@ function localeToLanguage(locale: string): string {
   }
 }
 
-// 1. Giao diện nhận data mới: Khớp với Dynamic UI
 interface GeneratePlanRequest {
   original_prompt: string;
-  answers: Record<string, any>; // Chứa các câu trả lời động (VD: { "budget": 5000, "date": "2024-10-10" })
+  answers: Record<string, any>;
   files?: string[];
 }
 
-const SYSTEM_PROMPT = `You are an expert planning assistant. Generate a detailed, actionable plan.
+function getSystemPrompt(currentDateTime: string, busyScheduleText: string, language: string): string {
+  return `You are an elite AI planning architect. Generate a detailed, actionable, and conflict-free plan.
+
+### CRITICAL TIME & SCHEDULING CONTEXT:
+1. CURRENT DATE & TIME: ${currentDateTime} (ISO-8601). Base all your scheduling calculations on this exact moment unless the user specified a future date.
+2. USER'S EXISTING BUSY SCHEDULE:
+[START BUSY BLOCKS]
+${busyScheduleText}
+[END BUSY BLOCKS]
 
 ### INPUT CONTEXT:
 You will receive a JSON payload containing:
 1. "original_prompt": The user's initial idea.
-2. "answers": Specific details, constraints, and preferences gathered from the user.
+2. "answers": Specific details, constraints, and dates gathered from the user.
 You MUST strictly obey all constraints provided in the "answers".
 
 ### OUTPUT SCHEMA (STRICT JSON ONLY, NO MARKDOWN):
 {
-  "prompt_goal": "A direct, action-oriented statement of the goal. Start with a verb. DO NOT use narrator phrases like 'The user wants to...' or 'Người dùng muốn...'. Example: 'Tiết kiệm $3,000 trong 6 tháng'",
-  "domain": "MUST BE EXACTLY ONE OF THESE ENGLISH WORDS:['Travel', 'Study', 'Fitness', 'Health', 'Food', 'Finance', 'Career', 'Event', 'Shopping', 'Home', 'Family', 'Hobby', 'Project', 'Pets', 'Lifestyle', 'Social', 'Content', 'Other']. Evaluate the prompt and pick the most suitable category. NEVER translate this word to the user's language.",
+  "prompt_goal": "A direct, action-oriented statement of the goal. Start with a verb. DO NOT use narrator phrases. Example: 'Save $3000 in 6 months'",
+  "domain": "MUST BE EXACTLY ONE OF THESE ENGLISH WORDS:['Travel', 'Study', 'Fitness', 'Health', 'Food', 'Finance', 'Career', 'Event', 'Shopping', 'Home', 'Family', 'Hobby', 'Project', 'Pets', 'Lifestyle', 'Social', 'Content', 'Other']. Evaluate the prompt and pick the most suitable category. NEVER translate this word.",
   "title": "Concise plan title (max 60 chars)",
- "ultimate_goal": "A direct, inspiring outcome statement. DO NOT use 'Người dùng sẽ...'. Example: 'Sở hữu quỹ dự phòng vững chắc và tự do tài chính'",
-  "total_duration": "Human-readable total duration (e.g., '3 days', '2 weeks')",
-  "success_metrics": ["Measurable criterion 1", "Measurable criterion 2"],
+  "ultimate_goal": "A direct, inspiring outcome statement.",
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "success_metrics":["Measurable criterion 1", "Measurable criterion 2"],
   "expert_advice": {
-    "tips": ["Actionable tip 1", "Actionable tip 2"],
-    "warnings": ["Potential pitfall based on their constraints"]
+    "tips":["Actionable tip 1", "Actionable tip 2"],
+    "warnings":["Potential pitfall based on constraints"]
   },
-  "milestones": [
+  "milestones":[
     {
       "milestone_index": 1,
       "name": "Phase/Day name (e.g., 'Day 1: Preparation')",
       "focus_objective": "Theme or focus for this milestone",
-      "tasks": [
+      "start_date": "YYYY-MM-DD",
+      "end_date": "YYYY-MM-DD",
+      "tasks":[
         {
           "task_index": 1,
           "name": "Specific actionable task name",
-          "task_time": "Suggested time like '09:00 AM' or 'Anytime'",
+          "scheduled_start": "YYYY-MM-DDTHH:mm:ssZ",
+          "scheduled_end": "YYYY-MM-DDTHH:mm:ssZ",
           "duration_minutes": 30,
           "resources_or_location": "What you need or where to go",
           "details": "Brief instructions or tips for this task"
@@ -57,12 +69,17 @@ You MUST strictly obey all constraints provided in the "answers".
 }
 
 ### RULES:
-- Break the plan into logical milestones based on the timeframe in the "answers".
-- Each milestone must have 2–6 concrete tasks.
+- CROSS-PLAN CONFLICT AVOIDANCE: You MUST NOT schedule any new tasks during the USER'S EXISTING BUSY SCHEDULE provided above. If a logical time overlaps with a busy block, find alternative free time.
+- TIME FORMAT: "scheduled_start" and "scheduled_end" MUST be exact ISO-8601 UTC timestamps.
+- Break the plan into logical milestones. Each milestone must have 2-6 concrete tasks.
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
-- DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases like "Người dùng muốn", "Kế hoạch này giúp", or "The user wants to". Start goals and tasks directly with action verbs (e.g., "Tiết kiệm...", "Học...", "Chạy...").
-- duration_minutes MUST be a positive integer ≥ 1. Never output 0 — use the best estimated value.
-- Return ONLY the JSON object.`;
+- DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases. Start goals and tasks directly with action verbs.
+- duration_minutes MUST be a positive integer >= 1. The mathematical difference between scheduled_start and scheduled_end MUST exactly match duration_minutes.
+- Return ONLY the JSON object.
+
+### LANGUAGE REQUIREMENT
+You MUST write all user-facing text values in the JSON output (title, goal, metrics, tips, milestone name, task name, details) in ${language}. Do NOT translate system keys like domain.`;
+}
 
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -71,10 +88,10 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -82,34 +99,58 @@ Deno.serve(async (req: Request) => {
 
     if (!body.original_prompt?.trim()) {
       return new Response(JSON.stringify({ error: 'original_prompt is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { data: profile } = await supabase
-      .from('profile')
-      .select('locale, tier')
-      .eq('id', user.id)
-      .single();
+    const now = new Date();
+    const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const busyBlocks: string[] =[];
 
+    const { data: existingTasks, error: taskError } = await supabase
+      .from('task')
+      .select('name, scheduled_start, scheduled_end, rrule')
+      .eq('user_id', user.id)
+      .or(`scheduled_start.gte.${now.toISOString()},rrule.not.is.null`);
+
+    if (existingTasks && existingTasks.length > 0) {
+      existingTasks.forEach(t => {
+        if (!t.scheduled_start || !t.scheduled_end) return;
+
+        if (t.rrule) {
+          try {
+            const rule = rrulestr(t.rrule, { dtstart: new Date(t.scheduled_start) });
+            const occurrences = rule.between(now, thirtyDaysLater, true);
+            const durationMs = new Date(t.scheduled_end).getTime() - new Date(t.scheduled_start).getTime();
+
+            occurrences.forEach(occDate => {
+              const occEndDate = new Date(occDate.getTime() + durationMs);
+              busyBlocks.push(`- ${occDate.toISOString()} to ${occEndDate.toISOString()}:[${t.name}]`);
+            });
+          } catch (err) {
+            console.error('RRULE parse error:', err);
+          }
+        } else {
+          busyBlocks.push(`- ${new Date(t.scheduled_start).toISOString()} to ${new Date(t.scheduled_end).toISOString()}:[${t.name}]`);
+        }
+      });
+    }
+
+    const busyScheduleText = busyBlocks.length > 0 
+      ? busyBlocks.join('\n') 
+      : "The user's schedule is completely free.";
+
+    const { data: profile } = await supabase.from('profiles').select('locale, tier').eq('id', user.id).single();
     const language = localeToLanguage(profile?.locale ?? 'en');
     const tier = profile?.tier ?? 'free';
 
-    const { data: config } = await supabase
-      .from('ai_config')
-      .select('model_name, max_output_tokens')
-      .eq('tier', tier)
-      .single();
-
+    const { data: config } = await supabase.from('ai_configs').select('model_name, max_output_tokens').eq('tier', tier).single();
     const modelName = config?.model_name ?? 'gemini-2.5-flash';
     const maxOutputTokens = config?.max_output_tokens ?? 8192;
     
-    const systemPrompt =
-      SYSTEM_PROMPT +
-      `\n\n### LANGUAGE REQUIREMENT\nYou MUST write all text values in the JSON output in ${language}. Do not use any other language.`;
+    const currentDateTime = now.toISOString();
+    const systemPrompt = getSystemPrompt(currentDateTime, busyScheduleText, language);
 
-    // 2. Tự động đóng gói Input thành JSON để đưa cho AI
     const inputForAI = JSON.stringify({
       original_prompt: body.original_prompt,
       answers: body.answers ?? {}
