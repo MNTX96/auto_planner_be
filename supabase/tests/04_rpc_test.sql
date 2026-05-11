@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT plan(8);
 
 -- Setup: authenticated user
 INSERT INTO auth.users (id, email) VALUES ('33333333-0000-0000-0000-000000000001', 'rpc_test@test.com');
@@ -73,6 +73,33 @@ SELECT is(
   'save_plan_transaction inserts 4 task rows'
 );
 
+SELECT is(
+  (
+    SELECT string_agg(milestone_index::TEXT, ',' ORDER BY milestone_index)
+    FROM milestone
+    WHERE plan_id = current_setting('test.plan_id', TRUE)::UUID
+  ),
+  '1,2',
+  'save_plan_transaction fills missing milestone indexes by order'
+);
+
+SELECT is(
+  (
+    SELECT string_agg(task_indexes, ';' ORDER BY milestone_index)
+    FROM (
+      SELECT
+        m.milestone_index,
+        string_agg(t.task_index::TEXT, ',' ORDER BY t.task_index) AS task_indexes
+      FROM milestone m
+      JOIN task t ON t.milestone_id = m.id
+      WHERE m.plan_id = current_setting('test.plan_id', TRUE)::UUID
+      GROUP BY m.milestone_index
+    ) indexed_tasks
+  ),
+  '1,2;1,2',
+  'save_plan_transaction fills missing task indexes by order'
+);
+
 -- ============================================================
 -- Missing prompt_goal: must fail with NOT NULL violation
 -- ============================================================
@@ -95,4 +122,3 @@ SELECT throws_ok(
 SELECT * FROM finish();
 
 ROLLBACK;
-

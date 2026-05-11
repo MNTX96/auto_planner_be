@@ -176,11 +176,11 @@ Deno.serve(async (req: Request) => {
       ? busyBlocks.join('\n') 
       : "The user's schedule is completely free.";
 
-    const { data: profile } = await supabase.from('profiles').select('locale, tier').eq('id', user.id).single();
+    const { data: profile } = await supabase.from('profile').select('locale, tier').eq('id', user.id).single();
     const language = localeToLanguage(profile?.locale ?? 'en');
     const tier = profile?.tier ?? 'free';
 
-    const { data: config } = await supabase.from('ai_configs').select('model_name, max_output_tokens').eq('tier', tier).single();
+    const { data: config } = await supabase.from('ai_config').select('model_name, max_output_tokens').eq('tier', tier).single();
     const modelName = config?.model_name ?? 'gemini-2.5-flash';
     const maxOutputTokens = config?.max_output_tokens ?? 8192;
     
