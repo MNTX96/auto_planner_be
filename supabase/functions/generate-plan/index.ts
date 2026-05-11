@@ -18,6 +18,22 @@ interface GeneratePlanRequest {
   files?: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validateGeneratedPlan(plan: Record<string, unknown>): void {
+  if (typeof plan.prompt_goal !== 'string' || !plan.prompt_goal.trim()) {
+    throw new Error('Generated plan is missing prompt_goal');
+  }
+  if (typeof plan.title !== 'string' || !plan.title.trim()) {
+    throw new Error('Generated plan is missing title');
+  }
+  if (!Array.isArray(plan.milestones) || plan.milestones.length === 0) {
+    throw new Error('Generated plan is missing milestones');
+  }
+}
+
 function getSystemPrompt(currentDateTime: string, busyScheduleText: string, language: string): string {
   return `You are an elite AI planning architect. Generate a detailed, actionable, and conflict-free plan.
 
@@ -86,6 +102,13 @@ Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -96,7 +119,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const body: GeneratePlanRequest = await req.json();
+    let body: GeneratePlanRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!body.original_prompt?.trim()) {
       return new Response(JSON.stringify({ error: 'original_prompt is required' }), {
@@ -113,6 +144,10 @@ Deno.serve(async (req: Request) => {
       .select('name, scheduled_start, scheduled_end, rrule')
       .eq('user_id', user.id)
       .or(`scheduled_start.gte.${now.toISOString()},rrule.not.is.null`);
+
+    if (taskError) {
+      console.error('Failed to fetch existing tasks:', taskError);
+    }
 
     if (existingTasks && existingTasks.length > 0) {
       existingTasks.forEach(t => {
@@ -154,7 +189,7 @@ Deno.serve(async (req: Request) => {
 
     const inputForAI = JSON.stringify({
       original_prompt: body.original_prompt,
-      answers: body.answers ?? {}
+      answers: body.answers ?? {},
     });
 
     const parts: VertexPart[] = [];
@@ -182,9 +217,36 @@ Deno.serve(async (req: Request) => {
     
     // 4. Clean up Markdown an toàn
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    const planJson = JSON.parse(raw);
+    const parsedPlanJson: unknown = JSON.parse(raw);
+    if (!isRecord(parsedPlanJson)) {
+      throw new Error('Generated plan is not a JSON object');
+    }
+    validateGeneratedPlan(parsedPlanJson);
 
-    return new Response(JSON.stringify(planJson), {
+    const payload = {
+      ...parsedPlanJson,
+      original_prompt: body.original_prompt,
+      answers: body.answers ?? {},
+    };
+
+    const { data: planId, error: saveError } = await supabase.rpc(
+      'save_plan_transaction',
+      { payload },
+    );
+
+    if (saveError) {
+      const status = saveError.message === 'Not authenticated' ? 401 : 500;
+      return new Response(JSON.stringify({ error: saveError.message }), {
+        status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!planId) {
+      throw new Error('save_plan_transaction did not return a plan_id');
+    }
+
+    return new Response(JSON.stringify({ plan_id: planId }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
