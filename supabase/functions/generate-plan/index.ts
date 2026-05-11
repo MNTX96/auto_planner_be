@@ -212,10 +212,8 @@ Deno.serve(async (req: Request) => {
     }
     parts.push({ text: inputForAI });
 
-    // 3. Gọi Gemini
     let raw = await callVertexGemini(systemPrompt, parts, modelName, maxOutputTokens);
     
-    // 4. Clean up Markdown an toàn
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsedPlanJson: unknown = JSON.parse(raw);
     if (!isRecord(parsedPlanJson)) {
