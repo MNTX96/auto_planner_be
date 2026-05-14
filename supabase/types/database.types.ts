@@ -230,7 +230,7 @@ export type Database = {
           scheduled_end?: string | null
           scheduled_start?: string | null
           status?: Database["public"]["Enums"]["task_status"]
-          task_index: number
+          task_index?: number
           task_type?: Database["public"]["Enums"]["task_type_enum"]
           updated_at?: string
           user_id?: string | null
