@@ -41,6 +41,83 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_task: {
+        Row: {
+          calendar_event_id: string | null
+          color: string | null
+          completed_at: string | null
+          created_at: string
+          details: string | null
+          duration_minutes: number | null
+          id: string
+          milestone_id: string | null
+          name: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          reminder_minutes_before: number | null
+          resources_or_location: string | null
+          rrule: string | null
+          scheduled_end: string | null
+          scheduled_start: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          task_index: number
+          task_type: Database["public"]["Enums"]["task_type_enum"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          color?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          duration_minutes?: number | null
+          id?: string
+          milestone_id?: string | null
+          name: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          reminder_minutes_before?: number | null
+          resources_or_location?: string | null
+          rrule?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          task_index?: number
+          task_type?: Database["public"]["Enums"]["task_type_enum"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          calendar_event_id?: string | null
+          color?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          duration_minutes?: number | null
+          id?: string
+          milestone_id?: string | null
+          name?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          reminder_minutes_before?: number | null
+          resources_or_location?: string | null
+          rrule?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          task_index?: number
+          task_type?: Database["public"]["Enums"]["task_type_enum"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "milestone"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestone: {
         Row: {
           created_at: string
@@ -198,71 +275,6 @@ export type Database = {
         }
         Relationships: []
       }
-      task: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          details: string | null
-          duration_minutes: number | null
-          id: string
-          milestone_id: string | null
-          name: string
-          resources_or_location: string | null
-          rrule: string | null
-          scheduled_end: string | null
-          scheduled_start: string | null
-          status: Database["public"]["Enums"]["task_status"]
-          task_index: number
-          task_type: Database["public"]["Enums"]["task_type_enum"]
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          details?: string | null
-          duration_minutes?: number | null
-          id?: string
-          milestone_id?: string | null
-          name: string
-          resources_or_location?: string | null
-          rrule?: string | null
-          scheduled_end?: string | null
-          scheduled_start?: string | null
-          status?: Database["public"]["Enums"]["task_status"]
-          task_index?: number
-          task_type?: Database["public"]["Enums"]["task_type_enum"]
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          details?: string | null
-          duration_minutes?: number | null
-          id?: string
-          milestone_id?: string | null
-          name?: string
-          resources_or_location?: string | null
-          rrule?: string | null
-          scheduled_end?: string | null
-          scheduled_start?: string | null
-          status?: Database["public"]["Enums"]["task_status"]
-          task_index?: number
-          task_type?: Database["public"]["Enums"]["task_type_enum"]
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tasks_milestone_id_fkey"
-            columns: ["milestone_id"]
-            isOneToOne: false
-            referencedRelation: "milestone"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -272,6 +284,7 @@ export type Database = {
     }
     Enums: {
       plan_status: "active" | "completed" | "abandoned"
+      task_priority: "low" | "medium" | "high" | "critical"
       task_status: "pending" | "in_progress" | "completed" | "missed"
       task_type_enum: "ai_plan" | "manual_single" | "manual_routine"
       tier_type: "free" | "pro"
@@ -403,6 +416,7 @@ export const Constants = {
   public: {
     Enums: {
       plan_status: ["active", "completed", "abandoned"],
+      task_priority: ["low", "medium", "high", "critical"],
       task_status: ["pending", "in_progress", "completed", "missed"],
       task_type_enum: ["ai_plan", "manual_single", "manual_routine"],
       tier_type: ["free", "pro"],
