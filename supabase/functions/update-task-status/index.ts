@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
   // Update task status — triggers handle completed_at and progress recalculation
   const { error: updateError } = await supabase
-    .from('task')
+    .from('daily_task')
     .update({ status: body.status })
     .eq('id', body.task_id);
 
@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
 
   // Fetch updated task + parent milestone + plan progress for client optimistic update
   const { data: task, error: fetchError } = await supabase
-    .from('task')
+    .from('daily_task')
     .select(`
       id,
       status,
