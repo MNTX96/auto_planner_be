@@ -1,22 +1,43 @@
 BEGIN;
 
-SELECT plan(14);
+SELECT plan(12);
 
--- Setup: user + plan + milestone + task
+-- Setup: user + plan + milestone + daily_task
 INSERT INTO auth.users (id, email) VALUES ('11111111-0000-0000-0000-000000000001', 'trigger_test@test.com');
-INSERT INTO profile (id, email) VALUES ('11111111-0000-0000-0000-000000000001', 'trigger_test@test.com');
+INSERT INTO profile (id, email)
+VALUES ('11111111-0000-0000-0000-000000000001', 'trigger_test@test.com')
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO plan (id, user_id, prompt_goal, title)
-VALUES ('dddddddd-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Goal', 'Plan');
+INSERT INTO plan (
+  id,
+  user_id,
+  prompt_goal,
+  title,
+  created_at,
+  updated_at
+)
+VALUES (
+  'dddddddd-0000-0000-0000-000000000001',
+  '11111111-0000-0000-0000-000000000001',
+  'Goal',
+  'Plan',
+  '2000-01-01T00:00:00Z',
+  '2000-01-01T00:00:00Z'
+);
 
-INSERT INTO milestone (id, plan_id, name)
-VALUES ('eeeeeeee-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000001', 'M1');
+INSERT INTO milestone (id, plan_id, milestone_index, name)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000001',
+  'dddddddd-0000-0000-0000-000000000001',
+  1,
+  'M1'
+);
 
-INSERT INTO task (id, milestone_id, name) VALUES
-  ('ffffffff-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 'Task 1'),
-  ('ffffffff-0000-0000-0000-000000000002', 'eeeeeeee-0000-0000-0000-000000000001', 'Task 2'),
-  ('ffffffff-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000001', 'Task 3'),
-  ('ffffffff-0000-0000-0000-000000000004', 'eeeeeeee-0000-0000-0000-000000000001', 'Task 4');
+INSERT INTO daily_task (id, milestone_id, task_index, name) VALUES
+  ('ffffffff-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 1, 'Task 1'),
+  ('ffffffff-0000-0000-0000-000000000002', 'eeeeeeee-0000-0000-0000-000000000001', 2, 'Task 2'),
+  ('ffffffff-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000001', 3, 'Task 3'),
+  ('ffffffff-0000-0000-0000-000000000004', 'eeeeeeee-0000-0000-0000-000000000001', 4, 'Task 4');
 
 -- ============================================================
 -- handle_new_user trigger: inserting to auth.users creates profile
@@ -31,9 +52,9 @@ SELECT is(
 -- ============================================================
 -- completed_at trigger: set when status → completed
 -- ============================================================
-UPDATE task SET status = 'completed' WHERE id = 'ffffffff-0000-0000-0000-000000000001';
+UPDATE daily_task SET status = 'completed' WHERE id = 'ffffffff-0000-0000-0000-000000000001';
 SELECT isnt(
-  (SELECT completed_at FROM task WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
+  (SELECT completed_at FROM daily_task WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
   NULL,
   'completed_at is set when task status becomes completed'
 );
@@ -41,9 +62,9 @@ SELECT isnt(
 -- ============================================================
 -- completed_at trigger: cleared when status reverts from completed
 -- ============================================================
-UPDATE task SET status = 'pending' WHERE id = 'ffffffff-0000-0000-0000-000000000001';
+UPDATE daily_task SET status = 'pending' WHERE id = 'ffffffff-0000-0000-0000-000000000001';
 SELECT is(
-  (SELECT completed_at FROM task WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
+  (SELECT completed_at FROM daily_task WHERE id = 'ffffffff-0000-0000-0000-000000000001'),
   NULL,
   'completed_at is cleared when task reverts from completed'
 );
@@ -65,7 +86,7 @@ SELECT is(
 -- ============================================================
 -- Progress triggers: 2 of 4 completed → milestone = 50, plan = 50
 -- ============================================================
-UPDATE task SET status = 'completed'
+UPDATE daily_task SET status = 'completed'
 WHERE id IN ('ffffffff-0000-0000-0000-000000000001', 'ffffffff-0000-0000-0000-000000000002');
 
 SELECT is(
@@ -82,7 +103,7 @@ SELECT is(
 -- ============================================================
 -- Progress triggers: 4 of 4 completed → milestone = 100, plan = 100
 -- ============================================================
-UPDATE task SET status = 'completed'
+UPDATE daily_task SET status = 'completed'
 WHERE id IN ('ffffffff-0000-0000-0000-000000000003', 'ffffffff-0000-0000-0000-000000000004');
 
 SELECT is(
@@ -99,11 +120,11 @@ SELECT is(
 -- ============================================================
 -- updated_at trigger: changes on UPDATE
 -- ============================================================
-DO $$ DECLARE orig TIMESTAMPTZ; BEGIN
-  SELECT updated_at INTO orig FROM plan WHERE id = 'dddddddd-0000-0000-0000-000000000001';
-  PERFORM pg_sleep(0.01);
+DO $$
+BEGIN
   UPDATE plan SET title = 'Updated Title' WHERE id = 'dddddddd-0000-0000-0000-000000000001';
-END $$;
+END;
+$$;
 
 SELECT isnt(
   (SELECT updated_at FROM plan WHERE id = 'dddddddd-0000-0000-0000-000000000001'),
@@ -112,9 +133,9 @@ SELECT isnt(
 );
 
 -- ============================================================
--- Progress triggers: deleting a task recalculates progress
+-- Progress triggers: deleting a daily_task recalculates progress
 -- ============================================================
-DELETE FROM task WHERE id = 'ffffffff-0000-0000-0000-000000000004';
+DELETE FROM daily_task WHERE id = 'ffffffff-0000-0000-0000-000000000004';
 -- 3 remaining tasks, all completed → still 100%
 SELECT is(
   (SELECT progress_percentage FROM milestone WHERE id = 'eeeeeeee-0000-0000-0000-000000000001'),
@@ -135,4 +156,3 @@ SELECT is(
 SELECT * FROM finish();
 
 ROLLBACK;
-

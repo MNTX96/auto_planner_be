@@ -8,5 +8,17 @@ REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM authenticated;
 
 -- rls_auto_enable: Supabase system function, must not be callable via API
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM authenticated;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'rls_auto_enable'
+  ) THEN
+    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon;
+    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM authenticated;
+  END IF;
+END;
+$$;

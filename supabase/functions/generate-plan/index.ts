@@ -1,6 +1,10 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
-import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
+import {
+  arrayBufferToBase64,
+  callVertexGemini,
+  VertexPart,
+} from '../_shared/vertex.ts';
 import pkg from 'npm:rrule';
 const { rrulestr } = pkg;
 
@@ -14,8 +18,31 @@ function localeToLanguage(locale: string): string {
 
 interface GeneratePlanRequest {
   original_prompt: string;
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   files?: string[];
+}
+
+interface AuthenticatedUser {
+  id: string;
+}
+
+interface GeneratedTask {
+  task_index?: unknown;
+  name?: unknown;
+  scheduled_start?: unknown;
+  scheduled_end?: unknown;
+  duration_minutes?: unknown;
+  resources_or_location?: unknown;
+  details?: unknown;
+}
+
+interface GeneratedMilestone {
+  milestone_index?: unknown;
+  name?: unknown;
+  focus_objective?: unknown;
+  start_date?: unknown;
+  end_date?: unknown;
+  tasks?: unknown;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -31,6 +58,158 @@ function validateGeneratedPlan(plan: Record<string, unknown>): void {
   }
   if (!Array.isArray(plan.milestones) || plan.milestones.length === 0) {
     throw new Error('Generated plan is missing milestones');
+  }
+}
+
+function textOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function numberOrNull(value: unknown): number | null {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim().length > 0
+    ? Number(value)
+    : Number.NaN;
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function positiveIntegerOrNull(value: unknown): number | null {
+  const parsed = numberOrNull(value);
+  if (parsed == null || parsed < 1) {
+    return null;
+  }
+  return Math.round(parsed);
+}
+
+function indexOrFallback(value: unknown, fallback: number): number {
+  const parsed = numberOrNull(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function generatedMilestones(plan: Record<string, unknown>): GeneratedMilestone[] {
+  const milestones = plan.milestones;
+  if (!Array.isArray(milestones)) {
+    return [];
+  }
+  return milestones.filter(isRecord) as GeneratedMilestone[];
+}
+
+async function saveGeneratedPlan(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  user: AuthenticatedUser,
+  generatedPlan: Record<string, unknown>,
+  request: GeneratePlanRequest,
+): Promise<string> {
+  let planId: string | null = null;
+  const milestones = generatedMilestones(generatedPlan);
+  if (milestones.length === 0) {
+    throw new Error('Generated plan is missing valid milestones.');
+  }
+
+  try {
+    const { data: plan, error: planError } = await supabase
+      .from('plan')
+      .insert({
+        user_id: user.id,
+        domain: textOrNull(generatedPlan.domain),
+        original_prompt: request.original_prompt,
+        answers: request.answers ?? {},
+        prompt_goal: textOrNull(generatedPlan.prompt_goal),
+        prompt_current_status: textOrNull(generatedPlan.prompt_current_status),
+        prompt_available_time: textOrNull(generatedPlan.prompt_available_time),
+        prompt_constraints: textOrNull(generatedPlan.prompt_constraints),
+        title: textOrNull(generatedPlan.title),
+        ultimate_goal: textOrNull(generatedPlan.ultimate_goal),
+        total_duration: textOrNull(generatedPlan.total_duration),
+        start_date: textOrNull(generatedPlan.start_date),
+        end_date: textOrNull(generatedPlan.end_date),
+        success_metrics: Array.isArray(generatedPlan.success_metrics)
+          ? generatedPlan.success_metrics
+          : [],
+        expert_advice: isRecord(generatedPlan.expert_advice)
+          ? generatedPlan.expert_advice
+          : {},
+      })
+      .select('id')
+      .single();
+
+    if (planError) {
+      throw planError;
+    }
+    if (!plan?.id) {
+      throw new Error('Failed to insert generated plan.');
+    }
+
+    planId = plan.id as string;
+
+    for (const [milestoneOffset, milestone] of milestones.entries()) {
+      const { data: insertedMilestone, error: milestoneError } = await supabase
+        .from('milestone')
+        .insert({
+          plan_id: planId,
+          milestone_index: indexOrFallback(
+            milestone.milestone_index,
+            milestoneOffset + 1,
+          ),
+          name: textOrNull(milestone.name),
+          focus_objective: textOrNull(milestone.focus_objective),
+          start_date: textOrNull(milestone.start_date),
+          end_date: textOrNull(milestone.end_date),
+        })
+        .select('id')
+        .single();
+
+      if (milestoneError) {
+        throw milestoneError;
+      }
+      if (!insertedMilestone?.id) {
+        throw new Error('Failed to insert generated milestone.');
+      }
+
+      const tasks = Array.isArray(milestone.tasks)
+        ? milestone.tasks.filter(isRecord) as GeneratedTask[]
+        : [];
+      if (tasks.length === 0) {
+        throw new Error('Generated milestone is missing tasks.');
+      }
+
+      const taskRows = tasks.map((task, taskOffset) => ({
+        milestone_id: insertedMilestone.id,
+        user_id: user.id,
+        task_index: indexOrFallback(task.task_index, taskOffset + 1),
+        name: textOrNull(task.name),
+        scheduled_start: textOrNull(task.scheduled_start),
+        scheduled_end: textOrNull(task.scheduled_end),
+        duration_minutes: positiveIntegerOrNull(task.duration_minutes),
+        resources_or_location: textOrNull(task.resources_or_location),
+        details: textOrNull(task.details),
+        task_type: 'ai_plan',
+        status: 'pending',
+      }));
+
+      const { error: taskError } = await supabase
+        .from('daily_task')
+        .insert(taskRows);
+
+      if (taskError) {
+        throw taskError;
+      }
+    }
+
+    return planId;
+  } catch (error) {
+    if (planId != null) {
+      const { error: cleanupError } = await supabase
+        .from('plan')
+        .delete()
+        .eq('id', planId);
+      if (cleanupError) {
+        console.error('Failed to clean up partially generated plan:', cleanupError);
+      }
+    }
+    throw error;
   }
 }
 
@@ -130,17 +309,21 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!body.original_prompt?.trim()) {
-      return new Response(JSON.stringify({ error: 'original_prompt is required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'original_prompt is required' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const busyBlocks: string[] =[];
+    const busyBlocks: string[] = [];
 
     const { data: existingTasks, error: taskError } = await supabase
-      .from('task')
+      .from('daily_task')
       .select('name, scheduled_start, scheduled_end, rrule')
       .eq('user_id', user.id)
       .or(`scheduled_start.gte.${now.toISOString()},rrule.not.is.null`);
@@ -150,40 +333,59 @@ Deno.serve(async (req: Request) => {
     }
 
     if (existingTasks && existingTasks.length > 0) {
-      existingTasks.forEach(t => {
-        if (!t.scheduled_start || !t.scheduled_end) return;
+      for (const task of existingTasks) {
+        if (!task.scheduled_start || !task.scheduled_end) {
+          continue;
+        }
 
-        if (t.rrule) {
+        if (task.rrule) {
           try {
-            const rule = rrulestr(t.rrule, { dtstart: new Date(t.scheduled_start) });
-            const occurrences = rule.between(now, thirtyDaysLater, true);
-            const durationMs = new Date(t.scheduled_end).getTime() - new Date(t.scheduled_start).getTime();
-
-            occurrences.forEach(occDate => {
-              const occEndDate = new Date(occDate.getTime() + durationMs);
-              busyBlocks.push(`- ${occDate.toISOString()} to ${occEndDate.toISOString()}:[${t.name}]`);
+            const rule = rrulestr(task.rrule, {
+              dtstart: new Date(task.scheduled_start),
             });
+            const occurrences = rule.between(now, thirtyDaysLater, true);
+            const durationMs = new Date(task.scheduled_end).getTime() -
+              new Date(task.scheduled_start).getTime();
+
+            for (const occDate of occurrences) {
+              const occEndDate = new Date(occDate.getTime() + durationMs);
+              busyBlocks.push(
+                `- ${occDate.toISOString()} to ${occEndDate.toISOString()}:[${task.name}]`,
+              );
+            }
           } catch (err) {
             console.error('RRULE parse error:', err);
           }
         } else {
-          busyBlocks.push(`- ${new Date(t.scheduled_start).toISOString()} to ${new Date(t.scheduled_end).toISOString()}:[${t.name}]`);
+          busyBlocks.push(
+            `- ${new Date(task.scheduled_start).toISOString()} to ${
+              new Date(task.scheduled_end).toISOString()
+            }:[${task.name}]`,
+          );
         }
-      });
+      }
     }
 
-    const busyScheduleText = busyBlocks.length > 0 
-      ? busyBlocks.join('\n') 
+    const busyScheduleText = busyBlocks.length > 0
+      ? busyBlocks.join('\n')
       : "The user's schedule is completely free.";
 
-    const { data: profile } = await supabase.from('profile').select('locale, tier').eq('id', user.id).single();
+    const { data: profile } = await supabase
+      .from('profile')
+      .select('locale, tier')
+      .eq('id', user.id)
+      .single();
     const language = localeToLanguage(profile?.locale ?? 'en');
     const tier = profile?.tier ?? 'free';
 
-    const { data: config } = await supabase.from('ai_config').select('model_name, max_output_tokens').eq('tier', tier).single();
+    const { data: config } = await supabase
+      .from('ai_config')
+      .select('model_name, max_output_tokens')
+      .eq('tier', tier)
+      .single();
     const modelName = config?.model_name ?? 'gemini-2.5-flash';
     const maxOutputTokens = config?.max_output_tokens ?? 32768;
-    
+
     const currentDateTime = now.toISOString();
     const systemPrompt = getSystemPrompt(currentDateTime, busyScheduleText, language);
 
@@ -195,7 +397,9 @@ Deno.serve(async (req: Request) => {
     const parts: VertexPart[] = [];
     if (body.files && body.files.length > 0) {
       for (const filePath of body.files) {
-        const { data, error } = await supabase.storage.from('prompt_attachments').download(filePath);
+        const { data, error } = await supabase.storage
+          .from('prompt_attachments')
+          .download(filePath);
         if (data) {
           const buffer = await data.arrayBuffer();
           const base64 = arrayBufferToBase64(buffer);
@@ -212,8 +416,13 @@ Deno.serve(async (req: Request) => {
     }
     parts.push({ text: inputForAI });
 
-    let raw = await callVertexGemini(systemPrompt, parts, modelName, maxOutputTokens);
-    
+    let raw = await callVertexGemini(
+      systemPrompt,
+      parts,
+      modelName,
+      maxOutputTokens,
+    );
+
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsedPlanJson: unknown = JSON.parse(raw);
     if (!isRecord(parsedPlanJson)) {
@@ -221,28 +430,7 @@ Deno.serve(async (req: Request) => {
     }
     validateGeneratedPlan(parsedPlanJson);
 
-    const payload = {
-      ...parsedPlanJson,
-      original_prompt: body.original_prompt,
-      answers: body.answers ?? {},
-    };
-
-    const { data: planId, error: saveError } = await supabase.rpc(
-      'save_plan_transaction',
-      { payload },
-    );
-
-    if (saveError) {
-      const status = saveError.message === 'Not authenticated' ? 401 : 500;
-      return new Response(JSON.stringify({ error: saveError.message }), {
-        status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (!planId) {
-      throw new Error('save_plan_transaction did not return a plan_id');
-    }
+    const planId = await saveGeneratedPlan(supabase, user, parsedPlanJson, body);
 
     return new Response(JSON.stringify({ plan_id: planId }), {
       status: 200,

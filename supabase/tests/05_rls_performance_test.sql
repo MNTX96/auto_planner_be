@@ -9,8 +9,8 @@ SELECT is(
     SELECT COUNT(*)::INTEGER
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND qual ~ 'auth\.(uid|jwt|role)\(\)'
-      AND qual !~ '\(select auth\.'
+      AND lower(coalesce(qual, '')) ~ 'auth\.(uid|jwt|role)\(\)'
+      AND lower(coalesce(qual, '')) !~ '\( ?select auth\.'
   ),
   0,
   'No RLS USING clause has bare auth.uid() — all must use (select auth.uid())'
@@ -21,8 +21,8 @@ SELECT is(
     SELECT COUNT(*)::INTEGER
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND with_check ~ 'auth\.(uid|jwt|role)\(\)'
-      AND with_check !~ '\(select auth\.'
+      AND lower(coalesce(with_check, '')) ~ 'auth\.(uid|jwt|role)\(\)'
+      AND lower(coalesce(with_check, '')) !~ '\( ?select auth\.'
   ),
   0,
   'No RLS WITH CHECK clause has bare auth.uid() — all must use (select auth.uid())'
