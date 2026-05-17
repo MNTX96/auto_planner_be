@@ -182,7 +182,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: config } = await supabase.from('ai_config').select('model_name, max_output_tokens').eq('tier', tier).single();
     const modelName = config?.model_name ?? 'gemini-2.5-flash';
-    const maxOutputTokens = config?.max_output_tokens ?? 8192;
+    const maxOutputTokens = config?.max_output_tokens ?? 32768;
     
     const currentDateTime = now.toISOString();
     const systemPrompt = getSystemPrompt(currentDateTime, busyScheduleText, language);
