@@ -54,6 +54,7 @@ export type Database = {
           name: string
           priority: Database["public"]["Enums"]["task_priority"]
           reminder_minutes_before: number | null
+          reminders_json: string | null
           resources_or_location: string | null
           rrule: string | null
           scheduled_end: string | null
@@ -76,6 +77,7 @@ export type Database = {
           name: string
           priority?: Database["public"]["Enums"]["task_priority"]
           reminder_minutes_before?: number | null
+          reminders_json?: string | null
           resources_or_location?: string | null
           rrule?: string | null
           scheduled_end?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           name?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           reminder_minutes_before?: number | null
+          reminders_json?: string | null
           resources_or_location?: string | null
           rrule?: string | null
           scheduled_end?: string | null
