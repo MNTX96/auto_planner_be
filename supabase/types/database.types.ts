@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -53,7 +73,6 @@ export type Database = {
           milestone_id: string | null
           name: string
           priority: Database["public"]["Enums"]["task_priority"]
-          reminder_minutes_before: number | null
           reminders_json: string | null
           resources_or_location: string | null
           rrule: string | null
@@ -76,7 +95,6 @@ export type Database = {
           milestone_id?: string | null
           name: string
           priority?: Database["public"]["Enums"]["task_priority"]
-          reminder_minutes_before?: number | null
           reminders_json?: string | null
           resources_or_location?: string | null
           rrule?: string | null
@@ -99,7 +117,6 @@ export type Database = {
           milestone_id?: string | null
           name?: string
           priority?: Database["public"]["Enums"]["task_priority"]
-          reminder_minutes_before?: number | null
           reminders_json?: string | null
           resources_or_location?: string | null
           rrule?: string | null
@@ -289,7 +306,11 @@ export type Database = {
       plan_status: "active" | "completed" | "abandoned"
       task_priority: "low" | "medium" | "high" | "critical"
       task_status: "pending" | "in_progress" | "completed" | "missed"
-      task_type_enum: "ai_plan" | "manual_single" | "manual_routine"
+      task_type_enum:
+        | "ai_plan"
+        | "manual_single"
+        | "manual_routine"
+        | "reminder"
       tier_type: "free" | "pro"
     }
     CompositeTypes: {
@@ -416,13 +437,22 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       plan_status: ["active", "completed", "abandoned"],
       task_priority: ["low", "medium", "high", "critical"],
       task_status: ["pending", "in_progress", "completed", "missed"],
-      task_type_enum: ["ai_plan", "manual_single", "manual_routine"],
+      task_type_enum: [
+        "ai_plan",
+        "manual_single",
+        "manual_routine",
+        "reminder",
+      ],
       tier_type: ["free", "pro"],
     },
   },
 } as const
+

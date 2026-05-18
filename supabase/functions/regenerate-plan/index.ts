@@ -1,36 +1,20 @@
-import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 
 interface RegeneratePlanRequest {
   plan_id: string;
 }
 
 Deno.serve(async (req: Request) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  const methodError = requirePost(req);
+  if (methodError) return methodError;
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  let body: RegeneratePlanRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody<RegeneratePlanRequest>(req);
+  if (!parsedBody.ok) return parsedBody.response;
+  const { body } = parsedBody;
 
   if (!body.plan_id?.trim()) {
-    return new Response(JSON.stringify({ error: 'plan_id is required' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'plan_id is required' }, 400);
   }
 
   const supabase = getSupabaseClient(req);
@@ -44,14 +28,8 @@ Deno.serve(async (req: Request) => {
 
   if (error || !plan) {
     const status = error?.code === 'PGRST116' ? 404 : 500;
-    return new Response(JSON.stringify({ error: error?.message ?? 'Plan not found' }), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: error?.message ?? 'Plan not found' }, status);
   }
 
-  return new Response(JSON.stringify(plan), {
-    status: 200,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return jsonResponse(plan);
 });

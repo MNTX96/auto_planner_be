@@ -1,5 +1,5 @@
-import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import { callVertexGemini, VertexPart, arrayBufferToBase64 } from '../_shared/vertex.ts';
 
 interface AnalyzePromptRequest {
@@ -67,26 +67,23 @@ Return ONLY a valid JSON object with no markdown formatting.
 }`;
 
 Deno.serve(async (req: Request) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  const methodError = requirePost(req);
+  if (methodError) return methodError;
 
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'Not authenticated' }, 401);
     }
 
-    const body: AnalyzePromptRequest = await req.json();
+    const parsedBody = await parseJsonBody<AnalyzePromptRequest>(req);
+    if (!parsedBody.ok) return parsedBody.response;
+    const { body } = parsedBody;
+
     if (!body.prompt?.trim()) {
-      return new Response(JSON.stringify({ error: 'prompt is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'prompt is required' }, 400);
     }
 
     const { data: profile } = await supabase
@@ -137,15 +134,9 @@ Deno.serve(async (req: Request) => {
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const analysis = JSON.parse(raw);
 
-    return new Response(JSON.stringify(analysis), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse(analysis);
   } catch (e) {
     console.error('analyze-prompt error:', e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: String(e) }, 500);
   }
 });

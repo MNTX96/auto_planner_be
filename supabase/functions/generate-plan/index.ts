@@ -1,5 +1,5 @@
-import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
   arrayBufferToBase64,
   callVertexGemini,
@@ -278,44 +278,23 @@ You MUST write all user-facing text values in the JSON output (title, goal, metr
 }
 
 Deno.serve(async (req: Request) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const methodError = requirePost(req);
+  if (methodError) return methodError;
 
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'Not authenticated' }, 401);
     }
 
-    let body: GeneratePlanRequest;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const parsedBody = await parseJsonBody<GeneratePlanRequest>(req);
+    if (!parsedBody.ok) return parsedBody.response;
+    const { body } = parsedBody;
 
     if (!body.original_prompt?.trim()) {
-      return new Response(
-        JSON.stringify({ error: 'original_prompt is required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
+      return jsonResponse({ error: 'original_prompt is required' }, 400);
     }
 
     const now = new Date();
@@ -432,15 +411,9 @@ Deno.serve(async (req: Request) => {
 
     const planId = await saveGeneratedPlan(supabase, user, parsedPlanJson, body);
 
-    return new Response(JSON.stringify({ plan_id: planId }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ plan_id: planId });
   } catch (e) {
     console.error('generate-plan error:', e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: String(e) }, 500);
   }
 });

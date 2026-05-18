@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(28);
+SELECT plan(37);
 
 -- ============================================================
 -- Tables exist
@@ -33,20 +33,126 @@ SELECT has_column('public', 'milestone', 'progress_percentage', 'milestone.progr
 SELECT has_column('public', 'daily_task', 'completed_at', 'daily_task.completed_at exists');
 SELECT has_column('public', 'daily_task', 'status',       'daily_task.status exists');
 SELECT has_column('public', 'daily_task', 'scheduled_start', 'daily_task.scheduled_start exists');
+SELECT has_column('public', 'daily_task', 'reminders_json', 'daily_task.reminders_json exists');
+SELECT hasnt_column('public', 'daily_task', 'reminder_minutes_before', 'daily_task.reminder_minutes_before removed');
 
 -- ============================================================
 -- ENUMs have correct values
 -- ============================================================
 SELECT has_type('public', 'plan_status', 'plan_status type exists');
 SELECT has_type('public', 'task_status', 'task_status type exists');
+SELECT ok(
+  'reminder' = ANY (
+    ARRAY(SELECT unnest(enum_range(NULL::public.task_type_enum))::text)
+  ),
+  'task_type_enum includes reminder'
+);
 
 -- ============================================================
 -- Indexes exist
 -- ============================================================
 SELECT has_index('public', 'plan',      'idx_plans_user_id',        'index on plan(user_id) exists');
-SELECT has_index('public', 'milestone', 'idx_milestones_plan_id',   'index on milestone(plan_id) exists');
-SELECT has_index('public', 'daily_task', 'idx_tasks_milestone_id', 'index on daily_task(milestone_id) exists');
 SELECT has_index('public', 'daily_task', 'idx_daily_task_scheduled_start', 'index on daily_task(scheduled_start) exists');
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_milestones_plan_id'
+  ),
+  0,
+  'redundant idx_milestones_plan_id removed'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_milestones_plan_order'
+  ),
+  0,
+  'redundant idx_milestones_plan_order removed'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_tasks_milestone_id'
+  ),
+  0,
+  'redundant idx_tasks_milestone_id removed'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_tasks_milestone_order'
+  ),
+  0,
+  'redundant idx_tasks_milestone_order removed'
+);
+
+-- ============================================================
+-- Trigger cleanup
+-- ============================================================
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_trigger
+    JOIN pg_class ON pg_class.oid = pg_trigger.tgrelid
+    JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_class.relname = 'plan'
+      AND pg_trigger.tgname = 'plan_set_updated_at'
+      AND NOT pg_trigger.tgisinternal
+  ),
+  1,
+  'plan keeps exactly one updated_at trigger'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_trigger
+    JOIN pg_class ON pg_class.oid = pg_trigger.tgrelid
+    JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_class.relname = 'plan'
+      AND pg_trigger.tgname = 'plans_set_updated_at'
+      AND NOT pg_trigger.tgisinternal
+  ),
+  0,
+  'duplicate plans_set_updated_at trigger removed'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_trigger
+    JOIN pg_class ON pg_class.oid = pg_trigger.tgrelid
+    JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_class.relname = 'milestone'
+      AND pg_trigger.tgname = 'milestone_set_updated_at'
+      AND NOT pg_trigger.tgisinternal
+  ),
+  1,
+  'milestone keeps exactly one updated_at trigger'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM pg_trigger
+    JOIN pg_class ON pg_class.oid = pg_trigger.tgrelid
+    JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_class.relname = 'milestone'
+      AND pg_trigger.tgname = 'milestones_set_updated_at'
+      AND NOT pg_trigger.tgisinternal
+  ),
+  0,
+  'duplicate milestones_set_updated_at trigger removed'
+);
 
 -- ============================================================
 -- CHECK constraints: progress_percentage is bounded 0-100

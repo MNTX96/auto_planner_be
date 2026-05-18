@@ -1,9 +1,14 @@
-import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 
 type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'missed';
 
-const VALID_STATUSES: TaskStatus[] = ['pending', 'in_progress', 'completed', 'missed'];
+const VALID_STATUSES: TaskStatus[] = [
+  'pending',
+  'in_progress',
+  'completed',
+  'missed',
+];
 
 interface UpdateTaskStatusRequest {
   task_id: string;
@@ -11,36 +16,20 @@ interface UpdateTaskStatusRequest {
 }
 
 Deno.serve(async (req: Request) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  const methodError = requirePost(req);
+  if (methodError) return methodError;
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  let body: UpdateTaskStatusRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody<UpdateTaskStatusRequest>(req);
+  if (!parsedBody.ok) return parsedBody.response;
+  const { body } = parsedBody;
 
   if (!body.task_id?.trim()) {
-    return new Response(JSON.stringify({ error: 'task_id is required' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'task_id is required' }, 400);
   }
   if (!VALID_STATUSES.includes(body.status)) {
-    return new Response(
-      JSON.stringify({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    return jsonResponse(
+      { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+      400,
     );
   }
 
@@ -54,10 +43,7 @@ Deno.serve(async (req: Request) => {
 
   if (updateError) {
     const status = updateError.code === 'PGRST116' ? 404 : 500;
-    return new Response(JSON.stringify({ error: updateError.message }), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: updateError.message }, status);
   }
 
   // Fetch updated task + parent milestone + plan progress for client optimistic update
@@ -82,23 +68,25 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (fetchError || !task) {
-    return new Response(JSON.stringify({ error: 'Task updated but could not fetch result' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const status = fetchError?.code === 'PGRST116' ? 404 : 500;
+    return jsonResponse(
+      { error: fetchError?.message ?? 'Task updated but could not fetch result' },
+      status,
+    );
   }
 
-  const milestoneData = Array.isArray(task.milestone) ? task.milestone[0] : task.milestone;
-  const planData = Array.isArray(milestoneData?.plan) ? milestoneData.plan[0] : milestoneData?.plan;
+  const milestoneData = Array.isArray(task.milestone)
+    ? task.milestone[0]
+    : task.milestone;
+  const planData = Array.isArray(milestoneData?.plan)
+    ? milestoneData.plan[0]
+    : milestoneData?.plan;
 
-  return new Response(
-    JSON.stringify({
-      task_id: task.id,
-      status: task.status,
-      completed_at: task.completed_at,
-      milestone_progress: milestoneData?.progress_percentage ?? 0,
-      plan_progress: planData?.progress_percentage ?? 0,
-    }),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-  );
+  return jsonResponse({
+    task_id: task.id,
+    status: task.status,
+    completed_at: task.completed_at,
+    milestone_progress: milestoneData?.progress_percentage ?? 0,
+    plan_progress: planData?.progress_percentage ?? 0,
+  });
 });

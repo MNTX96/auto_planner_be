@@ -1,5 +1,5 @@
-import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { getSupabaseClient } from '../_shared/auth.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import { callVertexGemini } from '../_shared/vertex.ts';
 
 interface CreateTaskAiRequest {
@@ -24,37 +24,22 @@ function formatTimezoneOffset(offsetMinutes: number): string {
 }
 
 Deno.serve(async (req: Request) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  const methodError = requirePost(req);
+  if (methodError) return methodError;
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  let body: CreateTaskAiRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const parsedBody = await parseJsonBody<CreateTaskAiRequest>(req);
+  if (!parsedBody.ok) return parsedBody.response;
+  const { body } = parsedBody;
 
   if (!body.text?.trim()) {
-    return new Response(JSON.stringify({ error: 'text is required' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'text is required' }, 400);
   }
 
   const supabase = getSupabaseClient(req);
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
   const offsetMinutes = body.timezone_offset_minutes ?? 420; 
@@ -134,9 +119,7 @@ Output:
     if (!Array.isArray(aiTasks)) throw new Error('AI response is not an array');
   } catch (err) {
     console.error('AI parsing error:', err);
-    return new Response(JSON.stringify({ error: 'Failed to parse natural language.' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Failed to parse natural language.' }, 500);
   }
 
   const tasksToInsert = aiTasks.map((t) => ({
@@ -157,13 +140,8 @@ Output:
 
   if (insertError) {
     console.error('Insert error:', insertError);
-    return new Response(JSON.stringify({ error: insertError.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: insertError.message }, 500);
   }
 
-  return new Response(
-    JSON.stringify({ tasks: inserted }),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+  return jsonResponse({ tasks: inserted });
 });
