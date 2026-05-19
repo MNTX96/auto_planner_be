@@ -41,6 +41,140 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_sync_connection: {
+        Row: {
+          account_email: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          provider: string
+          provider_calendar_id: string | null
+          provider_calendar_name: string | null
+          sync_cursor: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_email?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          provider: string
+          provider_calendar_id?: string | null
+          provider_calendar_name?: string | null
+          sync_cursor?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_email?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          provider?: string
+          provider_calendar_id?: string | null
+          provider_calendar_name?: string | null
+          sync_cursor?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      calendar_sync_event: {
+        Row: {
+          created_at: string
+          id: string
+          provider: string
+          provider_calendar_id: string | null
+          provider_deleted: boolean
+          provider_event_id: string
+          provider_updated_at: string | null
+          task_id: string
+          task_updated_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider: string
+          provider_calendar_id?: string | null
+          provider_deleted?: boolean
+          provider_event_id: string
+          provider_updated_at?: string | null
+          task_id: string
+          task_updated_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider?: string
+          provider_calendar_id?: string | null
+          provider_deleted?: boolean
+          provider_event_id?: string
+          provider_updated_at?: string | null
+          task_id?: string
+          task_updated_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_event_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_task"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_sync_token: {
+        Row: {
+          access_token_encrypted: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          provider: string
+          refresh_token_encrypted: string | null
+          scopes: string[]
+          token_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider: string
+          refresh_token_encrypted?: string | null
+          scopes?: string[]
+          token_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          refresh_token_encrypted?: string | null
+          scopes?: string[]
+          token_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_task: {
         Row: {
           calendar_event_id: string | null
