@@ -9,3 +9,10 @@ export function getSupabaseClient(req: Request) {
     },
   );
 }
+
+export function getServiceRoleClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+}
