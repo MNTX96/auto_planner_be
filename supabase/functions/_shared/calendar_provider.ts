@@ -268,14 +268,21 @@ export async function getProviderProfile(
 export async function ensureProviderCalendar(
   provider: CalendarProvider,
   accessToken: string,
+  existingCalendarId?: string | null,
 ): Promise<ProviderCalendar> {
   if (provider === 'google') {
-    const list = await fetchJson<{
-      items?: Array<{ id: string; summary: string }>;
-    }>('https://www.googleapis.com/calendar/v3/users/me/calendarList', accessToken);
-    const existing = list.items?.find((item) => item.summary === calendarName);
-    if (existing) {
-      return { id: existing.id, name: existing.summary };
+    if (existingCalendarId) {
+      try {
+        const existing = await fetchJson<{ id: string; summary: string }>(
+          `https://www.googleapis.com/calendar/v3/calendars/${
+            encodeURIComponent(existingCalendarId)
+          }`,
+          accessToken,
+        );
+        return { id: existing.id, name: existing.summary };
+      } catch {
+        // Recreate the app calendar if the stored calendar was removed.
+      }
     }
 
     const created = await fetchJson<{ id: string; summary: string }>(

@@ -113,6 +113,22 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const service = getServiceRoleClient();
+    const { data: existingConnection, error: existingConnectionError } =
+      await service
+        .from('calendar_sync_connection')
+        .select('provider_calendar_id')
+        .eq('user_id', user.id)
+        .eq('provider', body.provider)
+        .maybeSingle();
+    if (existingConnectionError) {
+      throw new CalendarOauthExchangeError(
+        'calendar_connection_save_failed',
+        existingConnectionError.message ??
+          'Could not load calendar connection.',
+      );
+    }
+
     const token = await exchangeOAuthCode({
       provider: body.provider,
       code: body.code,
@@ -123,8 +139,8 @@ Deno.serve(async (req: Request) => {
     const calendar = await ensureProviderCalendar(
       body.provider,
       token.access_token,
+      existingConnection?.provider_calendar_id,
     );
-    const service = getServiceRoleClient();
     const expiresAt = token.expires_in
       ? new Date(Date.now() + token.expires_in * 1000).toISOString()
       : null;
