@@ -414,7 +414,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
     }
     Enums: {
       plan_status: "active" | "completed" | "abandoned"
