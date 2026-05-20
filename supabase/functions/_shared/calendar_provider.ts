@@ -28,6 +28,21 @@ export interface ProviderEvent {
   deleted: boolean;
 }
 
+export type CalendarProviderErrorCode =
+  | 'missing_server_config'
+  | 'provider_token_exchange_failed'
+  | 'provider_calendar_access_failed';
+
+export class CalendarProviderError extends Error {
+  constructor(
+    public readonly code: CalendarProviderErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CalendarProviderError';
+  }
+}
+
 interface TaskRow {
   id: string;
   name: string;
@@ -42,7 +57,10 @@ const calendarName = 'OmniPlan';
 function requireEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
   if (!value) {
-    throw new Error(`${name} is not configured`);
+    throw new CalendarProviderError(
+      'missing_server_config',
+      `${name} is not configured`,
+    );
   }
   return value;
 }
@@ -57,11 +75,41 @@ function requireGoogleClientSecret(): string {
     optionalEnv('GOOGLE_CALENDAR_CLIENT_SECRET') ??
     optionalEnv('GOOGLE_WEB_CLIENT_SECRET');
   if (!clientSecret) {
-    throw new Error(
+    throw new CalendarProviderError(
+      'missing_server_config',
       'GOOGLE_CALENDAR_CLIENT_SECRET or GOOGLE_WEB_CLIENT_SECRET is not configured',
     );
   }
   return clientSecret;
+}
+
+function providerErrorMessage(text: string, fallback: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const decoded = JSON.parse(trimmed) as Record<string, unknown>;
+    const error = decoded.error;
+    const details = [
+      decoded.error_description,
+      typeof error === 'object' && error != null
+        ? (error as Record<string, unknown>).message
+        : null,
+      typeof error === 'string' ? error : null,
+      decoded.message,
+    ];
+    for (const detail of details) {
+      if (typeof detail === 'string' && detail.trim()) {
+        return `${fallback}: ${detail.trim()}`.slice(0, 500);
+      }
+    }
+  } catch {
+    // Non-JSON provider responses are still useful for diagnosing setup issues.
+  }
+
+  return `${fallback}: ${trimmed}`.slice(0, 500);
 }
 
 async function fetchForm<T>(
@@ -75,7 +123,13 @@ async function fetchForm<T>(
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(text || `Provider request failed with ${response.status}`);
+    throw new CalendarProviderError(
+      'provider_token_exchange_failed',
+      providerErrorMessage(
+        text,
+        `OAuth provider rejected the authorization code (${response.status})`,
+      ),
+    );
   }
   return JSON.parse(text) as T;
 }
@@ -98,7 +152,13 @@ async function fetchJson<T>(
   }
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(text || `Provider request failed with ${response.status}`);
+    throw new CalendarProviderError(
+      'provider_calendar_access_failed',
+      providerErrorMessage(
+        text,
+        `Calendar provider request failed (${response.status})`,
+      ),
+    );
   }
   return JSON.parse(text) as T;
 }

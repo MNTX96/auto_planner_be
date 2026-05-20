@@ -2,6 +2,7 @@ import { getServiceRoleClient, getSupabaseClient } from '../_shared/auth.ts';
 import { encryptJson } from '../_shared/calendar_crypto.ts';
 import {
   CalendarProvider,
+  CalendarProviderError,
   ensureProviderCalendar,
   exchangeOAuthCode,
   getProviderProfile,
@@ -18,6 +19,73 @@ interface CalendarOauthExchangeRequest {
 
 function isProvider(value: string): value is CalendarProvider {
   return value === 'google' || value === 'outlook';
+}
+
+type CalendarOauthExchangeFailureCode =
+  | 'missing_server_config'
+  | 'provider_token_exchange_failed'
+  | 'provider_calendar_access_failed'
+  | 'calendar_connection_save_failed'
+  | 'calendar_oauth_exchange_failed';
+
+class CalendarOauthExchangeError extends Error {
+  constructor(
+    public readonly code: CalendarOauthExchangeFailureCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CalendarOauthExchangeError';
+  }
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'object' && error != null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+  return String(error);
+}
+
+function classifyError(error: unknown): {
+  code: CalendarOauthExchangeFailureCode;
+  message: string;
+  status: number;
+} {
+  if (error instanceof CalendarProviderError) {
+    return {
+      code: error.code,
+      message: error.message,
+      status: error.code === 'missing_server_config' ? 500 : 502,
+    };
+  }
+
+  if (error instanceof CalendarOauthExchangeError) {
+    return {
+      code: error.code,
+      message: error.message,
+      status: 500,
+    };
+  }
+
+  const message = errorMessage(error);
+  if (message.includes('is not configured') || message.includes('not set')) {
+    return {
+      code: 'missing_server_config',
+      message,
+      status: 500,
+    };
+  }
+
+  return {
+    code: 'calendar_oauth_exchange_failed',
+    message: 'Calendar OAuth exchange failed',
+    status: 500,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -87,7 +155,10 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
     if (connectionError) {
-      throw connectionError;
+      throw new CalendarOauthExchangeError(
+        'calendar_connection_save_failed',
+        connectionError.message ?? 'Could not save calendar connection.',
+      );
     }
 
     const tokenPayload: Record<string, unknown> = {
@@ -105,23 +176,34 @@ Deno.serve(async (req: Request) => {
       .from('calendar_sync_token')
       .upsert(tokenPayload, { onConflict: 'user_id,provider' });
     if (tokenError) {
-      throw tokenError;
+      throw new CalendarOauthExchangeError(
+        'calendar_connection_save_failed',
+        tokenError.message ?? 'Could not save calendar token.',
+      );
     }
 
     return jsonResponse({ connection });
   } catch (error) {
     console.error('calendar-oauth-exchange failed', error);
-    await getServiceRoleClient()
-      .from('calendar_sync_connection')
-      .upsert(
-        {
-          user_id: user.id,
-          provider: body.provider,
-          enabled: false,
-          last_error: error instanceof Error ? error.message : String(error),
-        },
-        { onConflict: 'user_id,provider' },
-      );
-    return jsonResponse({ error: 'Calendar OAuth exchange failed' }, 500);
+    const classified = classifyError(error);
+    try {
+      await getServiceRoleClient()
+        .from('calendar_sync_connection')
+        .upsert(
+          {
+            user_id: user.id,
+            provider: body.provider,
+            enabled: false,
+            last_error: classified.message,
+          },
+          { onConflict: 'user_id,provider' },
+        );
+    } catch (saveError) {
+      console.error('calendar-oauth-exchange failure save failed', saveError);
+    }
+    return jsonResponse(
+      { error: classified.message, code: classified.code },
+      classified.status,
+    );
   }
 });
