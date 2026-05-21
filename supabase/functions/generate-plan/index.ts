@@ -1,6 +1,11 @@
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
+  formatTimezoneOffset,
+  normalizeTimestampToUtcIso,
+  toOffsetIsoString,
+} from '../_shared/time.ts';
+import {
   arrayBufferToBase64,
   callVertexGemini,
   VertexPart,
@@ -10,7 +15,8 @@ const { rrulestr } = pkg;
 
 function localeToLanguage(locale: string): string {
   try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(locale) ?? 'English';
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(locale) ??
+      'English';
   } catch {
     return 'English';
   }
@@ -20,6 +26,7 @@ interface GeneratePlanRequest {
   original_prompt: string;
   answers: Record<string, unknown>;
   files?: string[];
+  timezone_offset_minutes?: number;
 }
 
 interface AuthenticatedUser {
@@ -88,7 +95,9 @@ function indexOrFallback(value: unknown, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function generatedMilestones(plan: Record<string, unknown>): GeneratedMilestone[] {
+function generatedMilestones(
+  plan: Record<string, unknown>,
+): GeneratedMilestone[] {
   const milestones = plan.milestones;
   if (!Array.isArray(milestones)) {
     return [];
@@ -101,6 +110,7 @@ async function saveGeneratedPlan(
   user: AuthenticatedUser,
   generatedPlan: Record<string, unknown>,
   request: GeneratePlanRequest,
+  offsetMinutes: number,
 ): Promise<string> {
   let planId: string | null = null;
   const milestones = generatedMilestones(generatedPlan);
@@ -180,8 +190,14 @@ async function saveGeneratedPlan(
         user_id: user.id,
         task_index: indexOrFallback(task.task_index, taskOffset + 1),
         name: textOrNull(task.name),
-        scheduled_start: textOrNull(task.scheduled_start),
-        scheduled_end: textOrNull(task.scheduled_end),
+        scheduled_start: normalizeTimestampToUtcIso(
+          task.scheduled_start,
+          offsetMinutes,
+        ),
+        scheduled_end: normalizeTimestampToUtcIso(
+          task.scheduled_end,
+          offsetMinutes,
+        ),
         duration_minutes: positiveIntegerOrNull(task.duration_minutes),
         resources_or_location: textOrNull(task.resources_or_location),
         details: textOrNull(task.details),
@@ -206,19 +222,28 @@ async function saveGeneratedPlan(
         .delete()
         .eq('id', planId);
       if (cleanupError) {
-        console.error('Failed to clean up partially generated plan:', cleanupError);
+        console.error(
+          'Failed to clean up partially generated plan:',
+          cleanupError,
+        );
       }
     }
     throw error;
   }
 }
 
-function getSystemPrompt(currentDateTime: string, busyScheduleText: string, language: string): string {
+function getSystemPrompt(
+  currentDateTime: string,
+  timezoneOffset: string,
+  busyScheduleText: string,
+  language: string,
+): string {
   return `You are an elite AI planning architect. Generate a detailed, actionable, and conflict-free plan.
 
 ### CRITICAL TIME & SCHEDULING CONTEXT:
-1. CURRENT DATE & TIME: ${currentDateTime} (ISO-8601). Base all your scheduling calculations on this exact moment unless the user specified a future date.
-2. USER'S EXISTING BUSY SCHEDULE:
+1. CURRENT LOCAL DATE & TIME: ${currentDateTime} (ISO-8601). Base all your scheduling calculations on this exact local moment unless the user specified a future date.
+2. USER TIMEZONE OFFSET: ${timezoneOffset}. Interpret user-entered dates and times in this timezone.
+3. USER'S EXISTING BUSY SCHEDULE:
 [START BUSY BLOCKS]
 ${busyScheduleText}
 [END BUSY BLOCKS]
@@ -253,8 +278,8 @@ You MUST strictly obey all constraints provided in the "answers".
         {
           "task_index": 1,
           "name": "Specific actionable task name",
-          "scheduled_start": "YYYY-MM-DDTHH:mm:ssZ",
-          "scheduled_end": "YYYY-MM-DDTHH:mm:ssZ",
+          "scheduled_start": "YYYY-MM-DDTHH:mm:ss${timezoneOffset}",
+          "scheduled_end": "YYYY-MM-DDTHH:mm:ss${timezoneOffset}",
           "duration_minutes": 30,
           "resources_or_location": "What you need or where to go",
           "details": "Brief instructions or tips for this task"
@@ -266,7 +291,7 @@ You MUST strictly obey all constraints provided in the "answers".
 
 ### RULES:
 - CROSS-PLAN CONFLICT AVOIDANCE: You MUST NOT schedule any new tasks during the USER'S EXISTING BUSY SCHEDULE provided above. If a logical time overlaps with a busy block, find alternative free time.
-- TIME FORMAT: "scheduled_start" and "scheduled_end" MUST be exact ISO-8601 UTC timestamps.
+- TIME FORMAT: "scheduled_start" and "scheduled_end" MUST be exact ISO-8601 timestamps with explicit timezone offset ${timezoneOffset}. The server will convert them to UTC before saving.
 - Break the plan into logical milestones. Each milestone must have 2-6 concrete tasks.
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
 - DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases. Start goals and tasks directly with action verbs.
@@ -284,7 +309,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = getSupabaseClient(req);
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return jsonResponse({ error: 'Not authenticated' }, 401);
     }
@@ -297,6 +322,8 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'original_prompt is required' }, 400);
     }
 
+    const offsetMinutes = body.timezone_offset_minutes ?? 0;
+    const timezoneOffset = formatTimezoneOffset(offsetMinutes);
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const busyBlocks: string[] = [];
@@ -329,7 +356,9 @@ Deno.serve(async (req: Request) => {
             for (const occDate of occurrences) {
               const occEndDate = new Date(occDate.getTime() + durationMs);
               busyBlocks.push(
-                `- ${occDate.toISOString()} to ${occEndDate.toISOString()}:[${task.name}]`,
+                `- ${toOffsetIsoString(occDate, offsetMinutes)} to ${
+                  toOffsetIsoString(occEndDate, offsetMinutes)
+                }:[${task.name}]`,
               );
             }
           } catch (err) {
@@ -337,8 +366,10 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           busyBlocks.push(
-            `- ${new Date(task.scheduled_start).toISOString()} to ${
-              new Date(task.scheduled_end).toISOString()
+            `- ${
+              toOffsetIsoString(new Date(task.scheduled_start), offsetMinutes)
+            } to ${
+              toOffsetIsoString(new Date(task.scheduled_end), offsetMinutes)
             }:[${task.name}]`,
           );
         }
@@ -365,8 +396,13 @@ Deno.serve(async (req: Request) => {
     const modelName = config?.model_name ?? 'gemini-2.5-flash';
     const maxOutputTokens = config?.max_output_tokens ?? 32768;
 
-    const currentDateTime = now.toISOString();
-    const systemPrompt = getSystemPrompt(currentDateTime, busyScheduleText, language);
+    const currentDateTime = toOffsetIsoString(now, offsetMinutes);
+    const systemPrompt = getSystemPrompt(
+      currentDateTime,
+      timezoneOffset,
+      busyScheduleText,
+      language,
+    );
 
     const inputForAI = JSON.stringify({
       original_prompt: body.original_prompt,
@@ -409,7 +445,13 @@ Deno.serve(async (req: Request) => {
     }
     validateGeneratedPlan(parsedPlanJson);
 
-    const planId = await saveGeneratedPlan(supabase, user, parsedPlanJson, body);
+    const planId = await saveGeneratedPlan(
+      supabase,
+      user,
+      parsedPlanJson,
+      body,
+      offsetMinutes,
+    );
 
     return jsonResponse({ plan_id: planId });
   } catch (e) {

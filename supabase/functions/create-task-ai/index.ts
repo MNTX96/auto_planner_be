@@ -1,26 +1,23 @@
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
+import {
+  formatTimezoneOffset,
+  normalizeTimestampToUtcIso,
+  toOffsetIsoString,
+} from '../_shared/time.ts';
 import { callVertexGemini } from '../_shared/vertex.ts';
 
 interface CreateTaskAiRequest {
   text: string;
-  timezone_offset_minutes?: number; 
+  timezone_offset_minutes?: number;
 }
 
 interface AiTask {
   name: string;
-  scheduled_start: string; 
-  scheduled_end: string;   
+  scheduled_start: string;
+  scheduled_end: string;
   details?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-}
-
-function formatTimezoneOffset(offsetMinutes: number): string {
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const absOffset = Math.abs(offsetMinutes);
-  const hours = String(Math.floor(absOffset / 60)).padStart(2, '0');
-  const minutes = String(absOffset % 60).padStart(2, '0');
-  return `${sign}${hours}:${minutes}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -42,12 +39,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
-  const offsetMinutes = body.timezone_offset_minutes ?? 420; 
+  const offsetMinutes = body.timezone_offset_minutes ?? 420;
   const tzString = formatTimezoneOffset(offsetMinutes);
-  
+
   const utcNow = new Date();
-  const localNow = new Date(utcNow.getTime() + offsetMinutes * 60 * 1000);
-  const localIsoString = localNow.toISOString().replace('Z', '') + tzString; 
+  const localIsoString = toOffsetIsoString(utcNow, offsetMinutes);
   const localDateStr = localIsoString.split('T')[0];
 
   const systemPrompt = `You are a highly intelligent NLP task scheduling assistant.
@@ -112,9 +108,14 @@ Output:
 
   let aiTasks: AiTask[];
   try {
-    let raw = await callVertexGemini(systemPrompt, body.text, 'gemini-2.5-flash', 2048);
+    let raw = await callVertexGemini(
+      systemPrompt,
+      body.text,
+      'gemini-2.5-flash',
+      2048,
+    );
     raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    
+
     aiTasks = JSON.parse(raw);
     if (!Array.isArray(aiTasks)) throw new Error('AI response is not an array');
   } catch (err) {
@@ -122,16 +123,28 @@ Output:
     return jsonResponse({ error: 'Failed to parse natural language.' }, 500);
   }
 
-  const tasksToInsert = aiTasks.map((t) => ({
-    user_id: user.id,
-    name: t.name,
-    details: t.details ?? null,
-    scheduled_start: new Date(t.scheduled_start).toISOString(),
-    scheduled_end: new Date(t.scheduled_end).toISOString(),
-    task_type: 'manual_single',
-    priority: t.priority ?? 'medium', 
-    status: 'pending',
-  }));
+  let tasksToInsert: Record<string, unknown>[];
+  try {
+    tasksToInsert = aiTasks.map((t) => ({
+      user_id: user.id,
+      name: t.name,
+      details: t.details ?? null,
+      scheduled_start: normalizeTimestampToUtcIso(
+        t.scheduled_start,
+        offsetMinutes,
+      ),
+      scheduled_end: normalizeTimestampToUtcIso(
+        t.scheduled_end,
+        offsetMinutes,
+      ),
+      task_type: 'manual_single',
+      priority: t.priority ?? 'medium',
+      status: 'pending',
+    }));
+  } catch (err) {
+    console.error('AI schedule normalization error:', err);
+    return jsonResponse({ error: 'Invalid generated schedule.' }, 500);
+  }
 
   const { data: inserted, error: insertError } = await supabase
     .from('daily_task')
