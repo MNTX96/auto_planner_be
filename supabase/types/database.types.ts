@@ -460,13 +460,23 @@ export type Database = {
     }
     Functions: {
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
-      get_sync_changes: {
-        Args: { p_last_synced_at?: string | null }
-        Returns: Json
-      }
+      get_sync_changes: { Args: { p_last_synced_at?: string }; Returns: Json }
       set_user_device_synced: {
-        Args: { p_device_id: string; p_last_synced_at: string | null }
-        Returns: Database["public"]["Tables"]["user_device"]["Row"]
+        Args: { p_device_id: string; p_last_synced_at: string }
+        Returns: {
+          created_at: string
+          device_id: string
+          id: string
+          last_synced_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_device"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
