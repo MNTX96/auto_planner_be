@@ -24,10 +24,11 @@ VALUES ('bbbbbbbb-0000-0000-0000-000000000001',
         1,
         'Milestone A1');
 
-INSERT INTO daily_task (id, milestone_id, name)
+INSERT INTO daily_task (id, milestone_id, name, scheduled_start)
 VALUES ('cccccccc-0000-0000-0000-000000000001',
         'bbbbbbbb-0000-0000-0000-000000000001',
-        'Task A1');
+        'Task A1',
+        '2026-01-01T09:00:00Z');
 
 -- ============================================================
 -- Test as User B: should NOT see User A's data

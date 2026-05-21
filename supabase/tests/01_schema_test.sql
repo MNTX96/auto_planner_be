@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(37);
+SELECT plan(38);
 
 -- ============================================================
 -- Tables exist
@@ -174,6 +174,7 @@ SELECT col_not_null('public', 'plan',      'user_id',     'plan.user_id is NOT N
 SELECT col_not_null('public', 'plan',      'prompt_goal', 'plan.prompt_goal is NOT NULL');
 SELECT col_not_null('public', 'milestone', 'plan_id',     'milestone.plan_id is NOT NULL');
 SELECT col_not_null('public', 'daily_task', 'name', 'daily_task.name is NOT NULL');
+SELECT col_not_null('public', 'daily_task', 'scheduled_start', 'daily_task.scheduled_start is NOT NULL');
 
 SELECT * FROM finish();
 

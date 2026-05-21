@@ -193,7 +193,7 @@ export type Database = {
           resources_or_location: string | null
           rrule: string | null
           scheduled_end: string | null
-          scheduled_start: string | null
+          scheduled_start: string
           status: Database["public"]["Enums"]["task_status"]
           task_index: number
           task_type: Database["public"]["Enums"]["task_type_enum"]
@@ -217,7 +217,7 @@ export type Database = {
           resources_or_location?: string | null
           rrule?: string | null
           scheduled_end?: string | null
-          scheduled_start?: string | null
+          scheduled_start: string
           status?: Database["public"]["Enums"]["task_status"]
           task_index?: number
           task_type?: Database["public"]["Enums"]["task_type_enum"]
@@ -241,7 +241,7 @@ export type Database = {
           resources_or_location?: string | null
           rrule?: string | null
           scheduled_end?: string | null
-          scheduled_start?: string | null
+          scheduled_start?: string
           status?: Database["public"]["Enums"]["task_status"]
           task_index?: number
           task_type?: Database["public"]["Enums"]["task_type_enum"]

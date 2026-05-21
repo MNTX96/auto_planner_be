@@ -28,12 +28,13 @@ VALUES (
   'Sync milestone'
 );
 
-INSERT INTO daily_task (id, milestone_id, user_id, name)
+INSERT INTO daily_task (id, milestone_id, user_id, name, scheduled_start)
 VALUES (
   'cccccccc-2222-0000-0000-000000000001',
   'bbbbbbbb-2222-0000-0000-000000000001',
   '00000000-2222-0000-0000-000000000001',
-  'Sync task'
+  'Sync task',
+  '2026-01-01T09:00:00Z'
 );
 
 SELECT has_table('public', 'user_device', 'user_device table exists');

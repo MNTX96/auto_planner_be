@@ -33,11 +33,11 @@ VALUES (
   'M1'
 );
 
-INSERT INTO daily_task (id, milestone_id, task_index, name) VALUES
-  ('ffffffff-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 1, 'Task 1'),
-  ('ffffffff-0000-0000-0000-000000000002', 'eeeeeeee-0000-0000-0000-000000000001', 2, 'Task 2'),
-  ('ffffffff-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000001', 3, 'Task 3'),
-  ('ffffffff-0000-0000-0000-000000000004', 'eeeeeeee-0000-0000-0000-000000000001', 4, 'Task 4');
+INSERT INTO daily_task (id, milestone_id, task_index, name, scheduled_start) VALUES
+  ('ffffffff-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 1, 'Task 1', '2026-01-01T09:00:00Z'),
+  ('ffffffff-0000-0000-0000-000000000002', 'eeeeeeee-0000-0000-0000-000000000001', 2, 'Task 2', '2026-01-01T10:00:00Z'),
+  ('ffffffff-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000001', 3, 'Task 3', '2026-01-01T11:00:00Z'),
+  ('ffffffff-0000-0000-0000-000000000004', 'eeeeeeee-0000-0000-0000-000000000001', 4, 'Task 4', '2026-01-01T12:00:00Z');
 
 -- ============================================================
 -- handle_new_user trigger: inserting to auth.users creates profile
