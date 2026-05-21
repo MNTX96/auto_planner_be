@@ -181,6 +181,8 @@ export type Database = {
           color: string | null
           completed_at: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by_device_id: string | null
           details: string | null
           duration_minutes: number | null
           id: string
@@ -203,6 +205,8 @@ export type Database = {
           color?: string | null
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           details?: string | null
           duration_minutes?: number | null
           id?: string
@@ -225,6 +229,8 @@ export type Database = {
           color?: string | null
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           details?: string | null
           duration_minutes?: number | null
           id?: string
@@ -255,6 +261,8 @@ export type Database = {
       milestone: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          deleted_by_device_id: string | null
           end_date: string | null
           focus_objective: string | null
           id: string
@@ -267,6 +275,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           end_date?: string | null
           focus_objective?: string | null
           id?: string
@@ -279,6 +289,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           end_date?: string | null
           focus_objective?: string | null
           id?: string
@@ -303,6 +315,8 @@ export type Database = {
         Row: {
           answers: Json | null
           created_at: string
+          deleted_at: string | null
+          deleted_by_device_id: string | null
           domain: string | null
           end_date: string | null
           expert_advice: Json
@@ -325,6 +339,8 @@ export type Database = {
         Insert: {
           answers?: Json | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           domain?: string | null
           end_date?: string | null
           expert_advice?: Json
@@ -347,6 +363,8 @@ export type Database = {
         Update: {
           answers?: Json | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
           domain?: string | null
           end_date?: string | null
           expert_advice?: Json
@@ -409,12 +427,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_device: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          last_synced_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          last_synced_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          last_synced_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
+      get_sync_changes: {
+        Args: { p_last_synced_at?: string | null }
+        Returns: Json
+      }
+      set_user_device_synced: {
+        Args: { p_device_id: string; p_last_synced_at: string | null }
+        Returns: Database["public"]["Tables"]["user_device"]["Row"]
+      }
     }
     Enums: {
       plan_status: "active" | "completed" | "abandoned"
