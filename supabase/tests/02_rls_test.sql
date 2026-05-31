@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(13);
 
 -- Setup: create two test users and their profiles
 INSERT INTO auth.users (id, email) VALUES
@@ -30,6 +30,13 @@ VALUES ('cccccccc-0000-0000-0000-000000000001',
         'Task A1',
         '2026-01-01T09:00:00Z');
 
+INSERT INTO note (id, user_id, title, content_delta, plain_text)
+VALUES ('dddddddd-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000001',
+        'Note A1',
+        '[{"insert":"Note A1\n"}]'::jsonb,
+        'Note A1');
+
 -- ============================================================
 -- Test as User B: should NOT see User A's data
 -- ============================================================
@@ -54,12 +61,26 @@ SELECT is(
   'User B cannot SELECT User A daily_task'
 );
 
+SELECT is(
+  (SELECT COUNT(*) FROM note WHERE id = 'dddddddd-0000-0000-0000-000000000001')::INTEGER,
+  0,
+  'User B cannot SELECT User A note'
+);
+
 SELECT throws_ok(
   $$ INSERT INTO plan (user_id, prompt_goal, title) VALUES
      ('00000000-0000-0000-0000-000000000001', 'Injected', 'Injected Plan') $$,
   '42501',
   'new row violates row-level security policy for table "plan"',
   'User B cannot INSERT plan for User A'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO note (user_id, title, content_delta, plain_text) VALUES
+     ('00000000-0000-0000-0000-000000000001', 'Injected', '[{"insert":"x\n"}]'::jsonb, 'x') $$,
+  '42501',
+  'new row violates row-level security policy for table "note"',
+  'User B cannot INSERT note for User A'
 );
 
 UPDATE plan SET title = 'Hacked'
@@ -92,6 +113,12 @@ SELECT is(
   (SELECT COUNT(*) FROM daily_task WHERE id = 'cccccccc-0000-0000-0000-000000000001')::INTEGER,
   1,
   'User A can SELECT own daily_task'
+);
+
+SELECT is(
+  (SELECT COUNT(*) FROM note WHERE id = 'dddddddd-0000-0000-0000-000000000001')::INTEGER,
+  1,
+  'User A can SELECT own note'
 );
 
 -- User A can update own plan

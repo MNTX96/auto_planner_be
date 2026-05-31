@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(38);
+SELECT plan(50);
 
 -- ============================================================
 -- Tables exist
@@ -9,6 +9,7 @@ SELECT has_table('public', 'profile',   'profile table exists');
 SELECT has_table('public', 'plan',      'plan table exists');
 SELECT has_table('public', 'milestone', 'milestone table exists');
 SELECT has_table('public', 'daily_task', 'daily_task table exists');
+SELECT has_table('public', 'note', 'note table exists');
 
 -- ============================================================
 -- Columns exist on plan
@@ -37,10 +38,25 @@ SELECT has_column('public', 'daily_task', 'reminders_json', 'daily_task.reminder
 SELECT hasnt_column('public', 'daily_task', 'reminder_minutes_before', 'daily_task.reminder_minutes_before removed');
 
 -- ============================================================
+-- Columns exist on note
+-- ============================================================
+SELECT has_column('public', 'note', 'id', 'note.id exists');
+SELECT has_column('public', 'note', 'user_id', 'note.user_id exists');
+SELECT has_column('public', 'note', 'title', 'note.title exists');
+SELECT has_column('public', 'note', 'content_delta', 'note.content_delta exists');
+SELECT has_column('public', 'note', 'plain_text', 'note.plain_text exists');
+SELECT has_column('public', 'note', 'reference_type', 'note.reference_type exists');
+SELECT has_column('public', 'note', 'reference_id', 'note.reference_id exists');
+SELECT has_column('public', 'note', 'scheduled_at', 'note.scheduled_at exists');
+SELECT has_column('public', 'note', 'updated_at', 'note.updated_at exists');
+SELECT has_column('public', 'note', 'deleted_at', 'note.deleted_at exists');
+
+-- ============================================================
 -- ENUMs have correct values
 -- ============================================================
 SELECT has_type('public', 'plan_status', 'plan_status type exists');
 SELECT has_type('public', 'task_status', 'task_status type exists');
+SELECT has_type('public', 'note_reference_type_enum', 'note_reference_type_enum type exists');
 SELECT ok(
   'reminder' = ANY (
     ARRAY(SELECT unnest(enum_range(NULL::public.task_type_enum))::text)
