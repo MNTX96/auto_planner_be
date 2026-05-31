@@ -311,6 +311,57 @@ export type Database = {
           },
         ]
       }
+      note: {
+        Row: {
+          content_delta: Json
+          created_at: string
+          deleted_at: string | null
+          deleted_by_device_id: string | null
+          id: string
+          plain_text: string
+          reference_id: string | null
+          reference_type:
+            | Database["public"]["Enums"]["note_reference_type_enum"]
+            | null
+          scheduled_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_delta?: Json
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
+          id?: string
+          plain_text?: string
+          reference_id?: string | null
+          reference_type?:
+            | Database["public"]["Enums"]["note_reference_type_enum"]
+            | null
+          scheduled_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_delta?: Json
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by_device_id?: string | null
+          id?: string
+          plain_text?: string
+          reference_id?: string | null
+          reference_type?:
+            | Database["public"]["Enums"]["note_reference_type_enum"]
+            | null
+          scheduled_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan: {
         Row: {
           answers: Json | null
@@ -480,6 +531,7 @@ export type Database = {
       }
     }
     Enums: {
+      note_reference_type_enum: "plan" | "milestone" | "task"
       plan_status: "active" | "completed" | "abandoned"
       task_priority: "low" | "medium" | "high" | "critical"
       task_status: "pending" | "in_progress" | "completed" | "missed"
@@ -616,6 +668,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      note_reference_type_enum: ["plan", "milestone", "task"],
       plan_status: ["active", "completed", "abandoned"],
       task_priority: ["low", "medium", "high", "critical"],
       task_status: ["pending", "in_progress", "completed", "missed"],
