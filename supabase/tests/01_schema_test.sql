@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(50);
+SELECT plan(51);
 
 -- ============================================================
 -- Tables exist
@@ -45,6 +45,7 @@ SELECT has_column('public', 'note', 'user_id', 'note.user_id exists');
 SELECT has_column('public', 'note', 'title', 'note.title exists');
 SELECT has_column('public', 'note', 'content_delta', 'note.content_delta exists');
 SELECT has_column('public', 'note', 'plain_text', 'note.plain_text exists');
+SELECT has_column('public', 'note', 'color', 'note.color exists');
 SELECT has_column('public', 'note', 'reference_type', 'note.reference_type exists');
 SELECT has_column('public', 'note', 'reference_id', 'note.reference_id exists');
 SELECT has_column('public', 'note', 'scheduled_at', 'note.scheduled_at exists');

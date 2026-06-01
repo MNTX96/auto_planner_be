@@ -313,6 +313,7 @@ export type Database = {
       }
       note: {
         Row: {
+          color: string | null
           content_delta: Json
           created_at: string
           deleted_at: string | null
@@ -329,6 +330,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          color?: string | null
           content_delta?: Json
           created_at?: string
           deleted_at?: string | null
@@ -345,6 +347,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          color?: string | null
           content_delta?: Json
           created_at?: string
           deleted_at?: string | null
