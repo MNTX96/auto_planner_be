@@ -325,6 +325,7 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at: string | null
+          status: Database["public"]["Enums"]["note_status_enum"]
           title: string
           updated_at: string
           user_id: string
@@ -342,6 +343,7 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["note_status_enum"]
           title?: string
           updated_at?: string
           user_id: string
@@ -359,6 +361,7 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["note_status_enum"]
           title?: string
           updated_at?: string
           user_id?: string
@@ -535,6 +538,7 @@ export type Database = {
     }
     Enums: {
       note_reference_type_enum: "plan" | "milestone" | "task"
+      note_status_enum: "published" | "draft"
       plan_status: "active" | "completed" | "abandoned"
       task_priority: "low" | "medium" | "high" | "critical"
       task_status: "pending" | "in_progress" | "completed" | "missed"
@@ -672,6 +676,7 @@ export const Constants = {
   public: {
     Enums: {
       note_reference_type_enum: ["plan", "milestone", "task"],
+      note_status_enum: ["published", "draft"],
       plan_status: ["active", "completed", "abandoned"],
       task_priority: ["low", "medium", "high", "critical"],
       task_status: ["pending", "in_progress", "completed", "missed"],
