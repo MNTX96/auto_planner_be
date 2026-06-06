@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(16);
+SELECT plan(18);
 
 -- Setup: two users so RLS can prove device cursors are isolated.
 INSERT INTO auth.users (id, email) VALUES
@@ -110,6 +110,18 @@ SELECT is(
   jsonb_array_length(public.get_sync_changes(NULL)->'note'),
   1,
   'get_sync_changes returns owned notes for a first sync'
+);
+
+SELECT is(
+  (public.get_sync_changes(NULL)->'daily_task'->0) ? 'details',
+  false,
+  'get_sync_changes task payload does not include removed details'
+);
+
+SELECT is(
+  (public.get_sync_changes(NULL)->'note'->0) ? 'status',
+  false,
+  'get_sync_changes note payload does not include removed status'
 );
 
 SET LOCAL request.jwt.claims TO '{"sub":"00000000-2222-0000-0000-000000000002"}';

@@ -183,7 +183,6 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           deleted_by_device_id: string | null
-          details: string | null
           duration_minutes: number | null
           id: string
           milestone_id: string | null
@@ -207,7 +206,6 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           deleted_by_device_id?: string | null
-          details?: string | null
           duration_minutes?: number | null
           id?: string
           milestone_id?: string | null
@@ -231,7 +229,6 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           deleted_by_device_id?: string | null
-          details?: string | null
           duration_minutes?: number | null
           id?: string
           milestone_id?: string | null
@@ -325,7 +322,6 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at: string | null
-          status: Database["public"]["Enums"]["note_status_enum"]
           title: string
           updated_at: string
           user_id: string
@@ -343,7 +339,6 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at?: string | null
-          status?: Database["public"]["Enums"]["note_status_enum"]
           title?: string
           updated_at?: string
           user_id: string
@@ -361,7 +356,6 @@ export type Database = {
             | Database["public"]["Enums"]["note_reference_type_enum"]
             | null
           scheduled_at?: string | null
-          status?: Database["public"]["Enums"]["note_status_enum"]
           title?: string
           updated_at?: string
           user_id?: string
@@ -516,8 +510,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      append_plain_text_to_quill_delta: {
+        Args: { p_delta: Json; p_text: string | null }
+        Returns: Json
+      }
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
       get_sync_changes: { Args: { p_last_synced_at?: string }; Returns: Json }
+      normalize_note_content_delta: {
+        Args: { p_delta: Json; p_fallback_text?: string | null }
+        Returns: Json
+      }
+      plain_text_from_quill_delta: {
+        Args: { p_delta: Json }
+        Returns: string
+      }
+      quill_delta_from_plain_text: {
+        Args: { p_text: string | null }
+        Returns: Json
+      }
       set_user_device_synced: {
         Args: { p_device_id: string; p_last_synced_at: string }
         Returns: {
@@ -538,7 +548,6 @@ export type Database = {
     }
     Enums: {
       note_reference_type_enum: "plan" | "milestone" | "task"
-      note_status_enum: "published" | "draft"
       plan_status: "active" | "completed" | "abandoned"
       task_priority: "low" | "medium" | "high" | "critical"
       task_status: "pending" | "in_progress" | "completed" | "missed"
@@ -676,7 +685,6 @@ export const Constants = {
   public: {
     Enums: {
       note_reference_type_enum: ["plan", "milestone", "task"],
-      note_status_enum: ["published", "draft"],
       plan_status: ["active", "completed", "abandoned"],
       task_priority: ["low", "medium", "high", "critical"],
       task_status: ["pending", "in_progress", "completed", "missed"],

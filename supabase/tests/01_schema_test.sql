@@ -35,6 +35,7 @@ SELECT has_column('public', 'daily_task', 'completed_at', 'daily_task.completed_
 SELECT has_column('public', 'daily_task', 'status',       'daily_task.status exists');
 SELECT has_column('public', 'daily_task', 'scheduled_start', 'daily_task.scheduled_start exists');
 SELECT has_column('public', 'daily_task', 'reminders_json', 'daily_task.reminders_json exists');
+SELECT hasnt_column('public', 'daily_task', 'details', 'daily_task.details removed');
 SELECT hasnt_column('public', 'daily_task', 'reminder_minutes_before', 'daily_task.reminder_minutes_before removed');
 
 -- ============================================================
@@ -51,6 +52,7 @@ SELECT has_column('public', 'note', 'reference_id', 'note.reference_id exists');
 SELECT has_column('public', 'note', 'scheduled_at', 'note.scheduled_at exists');
 SELECT has_column('public', 'note', 'updated_at', 'note.updated_at exists');
 SELECT has_column('public', 'note', 'deleted_at', 'note.deleted_at exists');
+SELECT hasnt_column('public', 'note', 'status', 'note.status removed');
 
 -- ============================================================
 -- ENUMs have correct values
@@ -58,6 +60,7 @@ SELECT has_column('public', 'note', 'deleted_at', 'note.deleted_at exists');
 SELECT has_type('public', 'plan_status', 'plan_status type exists');
 SELECT has_type('public', 'task_status', 'task_status type exists');
 SELECT has_type('public', 'note_reference_type_enum', 'note_reference_type_enum type exists');
+SELECT hasnt_type('public', 'note_status_enum', 'note_status_enum removed');
 SELECT ok(
   'reminder' = ANY (
     ARRAY(SELECT unnest(enum_range(NULL::public.task_type_enum))::text)

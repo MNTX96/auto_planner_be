@@ -1,6 +1,10 @@
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
+  normalizeQuillDelta,
+  plainTextFromDelta,
+} from '../_shared/quill_delta.ts';
+import {
   formatTimezoneOffset,
   normalizeTimestampToUtcIso,
   toOffsetIsoString,
@@ -16,8 +20,12 @@ interface AiTask {
   name: string;
   scheduled_start: string;
   scheduled_end: string;
-  details?: string;
+  content_detail?: unknown;
   priority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+function hasOwnKey(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 Deno.serve(async (req: Request) => {
@@ -78,7 +86,7 @@ Each object MUST contain:
 2. "scheduled_start": A strict ISO-8601 string INCLUDING THE TIMEZONE OFFSET (e.g., "2026-05-15T09:00:00${tzString}").
 3. "scheduled_end": A strict ISO-8601 string INCLUDING THE TIMEZONE OFFSET.
 4. "priority": MUST BE exactly "low", "medium", "high", or "critical".
-5. "details": (Optional) Extracted notes or context.
+5. "content_detail": (Optional) Quill Delta JSON ops array for extracted notes/context. Use an array like [{"insert":"Detail text\\n"}]. The document must end with a newline.
 
 ### EXAMPLE INPUT & OUTPUT:
 Input: "Đưa mẹ đi cấp cứu ngay bây giờ, chiều mai 3h đi họp gấp, cuối tuần rảnh thì đi cafe"
@@ -89,14 +97,14 @@ Output:
     "scheduled_start": "${localIsoString}",
     "scheduled_end": "2026-05-15T13:09:00${tzString}",
     "priority": "critical",
-    "details": "Ngay bây giờ"
+    "content_detail": [{"insert":"Ngay bây giờ\\n"}]
   },
   {
     "name": "Họp gấp",
     "scheduled_start": "2026-05-16T15:00:00${tzString}",
     "scheduled_end": "2026-05-16T16:00:00${tzString}",
     "priority": "high",
-    "details": "Họp gấp"
+    "content_detail": [{"insert":"Họp gấp\\n"}]
   },
   {
     "name": "Đi cafe",
@@ -128,7 +136,6 @@ Output:
     tasksToInsert = aiTasks.map((t) => ({
       user_id: user.id,
       name: t.name,
-      details: t.details ?? null,
       scheduled_start: normalizeTimestampToUtcIso(
         t.scheduled_start,
         offsetMinutes,
@@ -156,5 +163,38 @@ Output:
     return jsonResponse({ error: insertError.message }, 500);
   }
 
-  return jsonResponse({ tasks: inserted });
+  const noteRows = (inserted ?? [])
+    .map((task, index) => {
+      const aiTask = aiTasks[index];
+      if (!aiTask || !hasOwnKey(aiTask, 'content_detail')) {
+        return null;
+      }
+
+      const contentDelta = normalizeQuillDelta(aiTask.content_detail);
+      return {
+        user_id: user.id,
+        title: task.name ?? '',
+        content_delta: contentDelta,
+        plain_text: plainTextFromDelta(contentDelta),
+        reference_type: 'task',
+        reference_id: task.id,
+        color: task.color ?? null,
+      };
+    })
+    .filter((row): row is Record<string, unknown> => row !== null);
+
+  let insertedNotes: unknown[] = [];
+  if (noteRows.length > 0) {
+    const { data: notes, error: noteInsertError } = await supabase
+      .from('note')
+      .insert(noteRows)
+      .select();
+    if (noteInsertError) {
+      console.error('Note insert error:', noteInsertError);
+      return jsonResponse({ error: noteInsertError.message }, 500);
+    }
+    insertedNotes = notes ?? [];
+  }
+
+  return jsonResponse({ tasks: inserted, notes: insertedNotes });
 });

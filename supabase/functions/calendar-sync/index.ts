@@ -8,6 +8,10 @@ import {
   upsertProviderEvent,
 } from '../_shared/calendar_provider.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
+import {
+  deltaFromPlainText,
+  plainTextFromDelta,
+} from '../_shared/quill_delta.ts';
 
 type CalendarSyncMode = 'full' | 'push_task';
 
@@ -36,10 +40,16 @@ interface TaskRow {
   id: string;
   user_id: string;
   name: string;
-  details?: string | null;
+  description?: string | null;
   scheduled_start: string;
   scheduled_end: string;
   updated_at?: string | null;
+}
+
+interface NoteRow {
+  id: string;
+  reference_id: string;
+  plain_text?: string | null;
 }
 
 interface EventMappingRow {
@@ -57,6 +67,100 @@ interface TokenSecret {
 
 function isProvider(value: string): value is CalendarProvider {
   return value === 'google' || value === 'outlook';
+}
+
+async function latestTaskNoteTextByTaskId(
+  service: ReturnType<typeof getServiceRoleClient>,
+  userId: string,
+  taskIds: string[],
+): Promise<Map<string, string>> {
+  if (taskIds.length === 0) {
+    return new Map();
+  }
+
+  const { data: notes, error } = await service
+    .from('note')
+    .select('id,reference_id,plain_text,updated_at,created_at')
+    .eq('user_id', userId)
+    .eq('reference_type', 'task')
+    .in('reference_id', taskIds)
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .returns<NoteRow[]>();
+  if (error) {
+    throw error;
+  }
+
+  const descriptions = new Map<string, string>();
+  for (const note of notes ?? []) {
+    if (!descriptions.has(note.reference_id)) {
+      descriptions.set(note.reference_id, note.plain_text ?? '');
+    }
+  }
+  return descriptions;
+}
+
+async function upsertTaskNoteFromDescription({
+  service,
+  userId,
+  taskId,
+  title,
+  description,
+}: {
+  service: ReturnType<typeof getServiceRoleClient>;
+  userId: string;
+  taskId: string;
+  title: string;
+  description?: string | null;
+}): Promise<void> {
+  if (description == null) {
+    return;
+  }
+
+  const contentDelta = deltaFromPlainText(description);
+  const notePayload = {
+    user_id: userId,
+    title,
+    content_delta: contentDelta,
+    plain_text: plainTextFromDelta(contentDelta),
+    reference_type: 'task',
+    reference_id: taskId,
+  };
+
+  const { data: existingNote, error: selectError } = await service
+    .from('note')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('reference_type', 'task')
+    .eq('reference_id', taskId)
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (selectError) {
+    throw selectError;
+  }
+
+  if (existingNote?.id) {
+    const { error } = await service
+      .from('note')
+      .update(notePayload)
+      .eq('id', existingNote.id)
+      .eq('user_id', userId);
+    if (error) {
+      throw error;
+    }
+    return;
+  }
+
+  const { error } = await service
+    .from('note')
+    .insert(notePayload);
+  if (error) {
+    throw error;
+  }
 }
 
 function eventWindow(): { start: Date; end: Date } {
@@ -180,7 +284,7 @@ async function pushTasks({
 }): Promise<number> {
   let query = service
     .from('daily_task')
-    .select('id,user_id,name,details,scheduled_start,scheduled_end,updated_at')
+    .select('id,user_id,name,scheduled_start,scheduled_end,updated_at')
     .eq('user_id', userId)
     .not('scheduled_start', 'is', null)
     .not('scheduled_end', 'is', null);
@@ -191,6 +295,12 @@ async function pushTasks({
   if (error) {
     throw error;
   }
+
+  const noteTextByTaskId = await latestTaskNoteTextByTaskId(
+    service,
+    userId,
+    (tasks ?? []).map((task) => task.id),
+  );
 
   let count = 0;
   for (const task of tasks ?? []) {
@@ -211,7 +321,10 @@ async function pushTasks({
       accessToken,
       calendarId,
       eventId: mapping?.provider_event_id,
-      task,
+      task: {
+        ...task,
+        description: noteTextByTaskId.get(task.id) ?? null,
+      },
     });
     const { error: upsertError } = await service
       .from('calendar_sync_event')
@@ -301,7 +414,6 @@ async function pullProviderEvents({
           .from('daily_task')
           .update({
             name: event.title,
-            details: event.description ?? null,
             scheduled_start: new Date(event.start).toISOString(),
             scheduled_end: new Date(event.end).toISOString(),
           })
@@ -310,6 +422,13 @@ async function pullProviderEvents({
         if (updateError) {
           throw updateError;
         }
+        await upsertTaskNoteFromDescription({
+          service,
+          userId,
+          taskId: task.id,
+          title: event.title,
+          description: event.description,
+        });
         count += 1;
       }
       const { error: mappingUpdateError } = await service
@@ -332,7 +451,6 @@ async function pullProviderEvents({
         user_id: userId,
         task_index: 0,
         name: event.title,
-        details: event.description ?? null,
         scheduled_start: new Date(event.start).toISOString(),
         scheduled_end: new Date(event.end).toISOString(),
         task_type: 'manual_single',
@@ -346,6 +464,13 @@ async function pullProviderEvents({
     if (insertError || !insertedTask) {
       throw insertError ?? new Error('Could not import calendar event');
     }
+    await upsertTaskNoteFromDescription({
+      service,
+      userId,
+      taskId: insertedTask.id,
+      title: event.title,
+      description: event.description,
+    });
     const { error: upsertError } = await service
       .from('calendar_sync_event')
       .upsert(

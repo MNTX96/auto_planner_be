@@ -1,6 +1,10 @@
 import { getSupabaseClient } from '../_shared/auth.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
+  normalizeQuillDelta,
+  plainTextFromDelta,
+} from '../_shared/quill_delta.ts';
+import {
   formatTimezoneOffset,
   normalizeTimestampToUtcIso,
   toOffsetIsoString,
@@ -40,7 +44,7 @@ interface GeneratedTask {
   scheduled_end?: unknown;
   duration_minutes?: unknown;
   resources_or_location?: unknown;
-  details?: unknown;
+  content_detail?: unknown;
 }
 
 interface GeneratedMilestone {
@@ -54,6 +58,10 @@ interface GeneratedMilestone {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOwnKey(value: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function validateGeneratedPlan(plan: Record<string, unknown>): void {
@@ -200,17 +208,48 @@ async function saveGeneratedPlan(
         ),
         duration_minutes: positiveIntegerOrNull(task.duration_minutes),
         resources_or_location: textOrNull(task.resources_or_location),
-        details: textOrNull(task.details),
         task_type: 'ai_plan',
         status: 'pending',
       }));
 
-      const { error: taskError } = await supabase
+      const { data: insertedTasks, error: taskError } = await supabase
         .from('daily_task')
-        .insert(taskRows);
+        .insert(taskRows)
+        .select('id,name,color');
 
       if (taskError) {
         throw taskError;
+      }
+
+      const noteRows = (insertedTasks ?? [])
+        .map((task, taskOffset) => {
+          const generatedTask = tasks[taskOffset];
+          if (!generatedTask || !hasOwnKey(generatedTask, 'content_detail')) {
+            return null;
+          }
+
+          const contentDelta = normalizeQuillDelta(
+            generatedTask.content_detail,
+          );
+          return {
+            user_id: user.id,
+            title: task.name ?? '',
+            content_delta: contentDelta,
+            plain_text: plainTextFromDelta(contentDelta),
+            reference_type: 'task',
+            reference_id: task.id,
+            color: task.color ?? null,
+          };
+        })
+        .filter((row): row is Record<string, unknown> => row !== null);
+
+      if (noteRows.length > 0) {
+        const { error: noteError } = await supabase
+          .from('note')
+          .insert(noteRows);
+        if (noteError) {
+          throw noteError;
+        }
       }
     }
 
@@ -282,7 +321,7 @@ You MUST strictly obey all constraints provided in the "answers".
           "scheduled_end": "YYYY-MM-DDTHH:mm:ss${timezoneOffset}",
           "duration_minutes": 30,
           "resources_or_location": "What you need or where to go",
-          "details": "Brief instructions or tips for this task"
+          "content_detail": [{"insert":"Brief instructions or tips for this task\\n"}]
         }
       ]
     }
@@ -296,10 +335,11 @@ You MUST strictly obey all constraints provided in the "answers".
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
 - DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases. Start goals and tasks directly with action verbs.
 - duration_minutes MUST be a positive integer >= 1. The mathematical difference between scheduled_start and scheduled_end MUST exactly match duration_minutes.
+- NOTE CONTENT: "content_detail" is optional rich text for task notes. It MUST be a Quill Delta JSON ops array, such as [{"insert":"Text\\n"}], and document text must end with a newline.
 - Return ONLY the JSON object.
 
 ### LANGUAGE REQUIREMENT
-You MUST write all user-facing text values in the JSON output (title, goal, metrics, tips, milestone name, task name, details) in ${language}. Do NOT translate system keys like domain.`;
+You MUST write all user-facing text values in the JSON output (title, goal, metrics, tips, milestone name, task name, content_detail text) in ${language}. Do NOT translate system keys like domain.`;
 }
 
 Deno.serve(async (req: Request) => {

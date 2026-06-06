@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT plan(7);
 
 -- Setup: two users + a plan owned by user A
 INSERT INTO auth.users (id, email) VALUES
@@ -85,6 +85,17 @@ SELECT is(
   ),
   1,
   'Milestone 2 has 1 task'
+);
+
+SELECT is(
+  (
+    SELECT (
+      get_plan_detail('aaaaaaaa-1111-0000-0000-000000000001')
+        ->'milestones'->0->'tasks'->0
+    ) ? 'details'
+  ),
+  false,
+  'get_plan_detail task payload does not include removed details'
 );
 
 -- ============================================================

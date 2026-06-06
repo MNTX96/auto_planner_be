@@ -46,7 +46,7 @@ export class CalendarProviderError extends Error {
 interface TaskRow {
   id: string;
   name: string;
-  details?: string | null;
+  description?: string | null;
   scheduled_start: string;
   scheduled_end: string;
   updated_at?: string | null;
@@ -421,7 +421,7 @@ export async function upsertProviderEvent({
   if (provider === 'google') {
     const body = {
       summary: task.name,
-      description: task.details ?? undefined,
+      description: task.description ?? undefined,
       start: { dateTime: new Date(task.scheduled_start).toISOString() },
       end: { dateTime: new Date(task.scheduled_end).toISOString() },
       extendedProperties: {
@@ -453,7 +453,7 @@ export async function upsertProviderEvent({
     subject: task.name,
     body: {
       contentType: 'text',
-      content: task.details ?? '',
+      content: task.description ?? '',
     },
     start: {
       dateTime: new Date(task.scheduled_start).toISOString().replace('Z', ''),
