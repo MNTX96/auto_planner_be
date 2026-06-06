@@ -511,23 +511,18 @@ export type Database = {
     }
     Functions: {
       append_plain_text_to_quill_delta: {
-        Args: { p_delta: Json; p_text: string | null }
+        Args: { p_delta: Json; p_text: string }
         Returns: Json
       }
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
       get_sync_changes: { Args: { p_last_synced_at?: string }; Returns: Json }
       normalize_note_content_delta: {
-        Args: { p_delta: Json; p_fallback_text?: string | null }
+        Args: { p_delta: Json; p_fallback_text?: string }
         Returns: Json
       }
-      plain_text_from_quill_delta: {
-        Args: { p_delta: Json }
-        Returns: string
-      }
-      quill_delta_from_plain_text: {
-        Args: { p_text: string | null }
-        Returns: Json
-      }
+      plain_text_from_quill_delta: { Args: { p_delta: Json }; Returns: string }
+      quill_delta_from_plain_text: { Args: { p_text: string }; Returns: Json }
+      save_plan_transaction: { Args: { payload: Json }; Returns: string }
       set_user_device_synced: {
         Args: { p_device_id: string; p_last_synced_at: string }
         Returns: {
