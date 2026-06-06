@@ -100,7 +100,11 @@ BEGIN
       AND table_name = 'daily_task'
       AND column_name = 'details'
   ) THEN
-    WITH tasks_with_details AS (
+    DROP TABLE IF EXISTS task_details_to_note_backfill;
+
+    CREATE TEMP TABLE task_details_to_note_backfill
+    ON COMMIT DROP
+    AS
       SELECT
         id,
         user_id,
@@ -111,14 +115,14 @@ BEGIN
       FROM public.daily_task
       WHERE details IS NOT NULL
         AND btrim(details) <> ''
-        AND deleted_at IS NULL
-    ),
-    latest_note AS (
+        AND deleted_at IS NULL;
+
+    WITH latest_note AS (
       SELECT DISTINCT ON (n.reference_id)
         n.id AS note_id,
         n.reference_id AS task_id
       FROM public.note n
-      JOIN tasks_with_details t ON t.id = n.reference_id
+      JOIN task_details_to_note_backfill t ON t.id = n.reference_id
       WHERE n.reference_type = 'task'
         AND n.deleted_at IS NULL
       ORDER BY n.reference_id, n.updated_at DESC NULLS LAST, n.created_at DESC, n.id
@@ -132,7 +136,7 @@ BEGIN
       END,
       updated_at = NOW()
     FROM latest_note ln
-    JOIN tasks_with_details t ON t.id = ln.task_id
+    JOIN task_details_to_note_backfill t ON t.id = ln.task_id
     WHERE n.id = ln.note_id;
 
     INSERT INTO public.note (
@@ -156,7 +160,7 @@ BEGIN
       t.color,
       COALESCE(t.created_at, NOW()),
       NOW()
-    FROM tasks_with_details t
+    FROM task_details_to_note_backfill t
     WHERE NOT EXISTS (
       SELECT 1
       FROM public.note n
@@ -164,6 +168,8 @@ BEGIN
         AND n.reference_id = t.id
         AND n.deleted_at IS NULL
     );
+
+    DROP TABLE IF EXISTS task_details_to_note_backfill;
   END IF;
 END;
 $$;
