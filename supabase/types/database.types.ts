@@ -583,6 +583,9 @@ export type Database = {
         Args: { p_note_id: string; p_updates: Json }
         Returns: Json
       }
+      plain_text_from_quill_delta: { Args: { p_delta: Json }; Returns: string }
+      quill_delta_from_plain_text: { Args: { p_text: string }; Returns: Json }
+      save_plan_transaction: { Args: { payload: Json }; Returns: string }
       set_user_device_synced: {
         Args: { p_device_id: string; p_last_synced_at: string }
         Returns: {
