@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(51);
+SELECT no_plan();
 
 -- ============================================================
 -- Tables exist
@@ -10,6 +10,7 @@ SELECT has_table('public', 'plan',      'plan table exists');
 SELECT has_table('public', 'milestone', 'milestone table exists');
 SELECT has_table('public', 'daily_task', 'daily_task table exists');
 SELECT has_table('public', 'note', 'note table exists');
+SELECT has_table('public', 'note_crdt_update', 'note_crdt_update table exists');
 
 -- ============================================================
 -- Columns exist on plan
@@ -44,8 +45,13 @@ SELECT hasnt_column('public', 'daily_task', 'reminder_minutes_before', 'daily_ta
 SELECT has_column('public', 'note', 'id', 'note.id exists');
 SELECT has_column('public', 'note', 'user_id', 'note.user_id exists');
 SELECT has_column('public', 'note', 'title', 'note.title exists');
-SELECT has_column('public', 'note', 'content_delta', 'note.content_delta exists');
+SELECT hasnt_column('public', 'note', 'content_delta', 'note.content_delta removed');
+SELECT has_column('public', 'note', 'content_document', 'note.content_document exists');
 SELECT has_column('public', 'note', 'plain_text', 'note.plain_text exists');
+SELECT has_column('public', 'note', 'crdt_state_vector_base64', 'note.crdt_state_vector_base64 exists');
+SELECT has_column('public', 'note', 'crdt_snapshot_update_base64', 'note.crdt_snapshot_update_base64 exists');
+SELECT has_column('public', 'note', 'crdt_snapshot_version', 'note.crdt_snapshot_version exists');
+SELECT has_column('public', 'note', 'last_crdt_server_seq', 'note.last_crdt_server_seq exists');
 SELECT has_column('public', 'note', 'color', 'note.color exists');
 SELECT has_column('public', 'note', 'reference_type', 'note.reference_type exists');
 SELECT has_column('public', 'note', 'reference_id', 'note.reference_id exists');
@@ -53,6 +59,15 @@ SELECT has_column('public', 'note', 'scheduled_at', 'note.scheduled_at exists');
 SELECT has_column('public', 'note', 'updated_at', 'note.updated_at exists');
 SELECT has_column('public', 'note', 'deleted_at', 'note.deleted_at exists');
 SELECT hasnt_column('public', 'note', 'status', 'note.status removed');
+
+-- ============================================================
+-- Columns exist on note_crdt_update
+-- ============================================================
+SELECT has_column('public', 'note_crdt_update', 'note_id', 'note_crdt_update.note_id exists');
+SELECT has_column('public', 'note_crdt_update', 'device_id', 'note_crdt_update.device_id exists');
+SELECT has_column('public', 'note_crdt_update', 'client_seq', 'note_crdt_update.client_seq exists');
+SELECT has_column('public', 'note_crdt_update', 'server_seq', 'note_crdt_update.server_seq exists');
+SELECT has_column('public', 'note_crdt_update', 'update_base64', 'note_crdt_update.update_base64 exists');
 
 -- ============================================================
 -- ENUMs have correct values

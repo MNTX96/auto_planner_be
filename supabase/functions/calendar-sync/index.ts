@@ -1,4 +1,8 @@
 import { getServiceRoleClient, getSupabaseClient } from '../_shared/auth.ts';
+import {
+  documentFromPlainText,
+  plainTextFromDocument,
+} from '../_shared/appflowy_document.ts';
 import { decryptJson, encryptJson } from '../_shared/calendar_crypto.ts';
 import {
   CalendarProvider,
@@ -8,10 +12,6 @@ import {
   upsertProviderEvent,
 } from '../_shared/calendar_provider.ts';
 import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
-import {
-  deltaFromPlainText,
-  plainTextFromDelta,
-} from '../_shared/quill_delta.ts';
 
 type CalendarSyncMode = 'full' | 'push_task';
 
@@ -118,12 +118,12 @@ async function upsertTaskNoteFromDescription({
     return;
   }
 
-  const contentDelta = deltaFromPlainText(description);
+  const contentDocument = documentFromPlainText(description);
   const notePayload = {
     user_id: userId,
     title,
-    content_delta: contentDelta,
-    plain_text: plainTextFromDelta(contentDelta),
+    content_document: contentDocument,
+    plain_text: plainTextFromDocument(contentDocument),
     reference_type: 'task',
     reference_id: taskId,
   };

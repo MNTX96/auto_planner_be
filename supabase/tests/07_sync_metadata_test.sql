@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT no_plan();
 
 -- Setup: two users so RLS can prove device cursors are isolated.
 INSERT INTO auth.users (id, email) VALUES
@@ -41,7 +41,7 @@ INSERT INTO note (
   id,
   user_id,
   title,
-  content_delta,
+  content_document,
   plain_text,
   reference_type,
   reference_id,
@@ -50,7 +50,7 @@ INSERT INTO note (
   'dddddddd-2222-0000-0000-000000000001',
   '00000000-2222-0000-0000-000000000001',
   'Sync note',
-  '[{"insert":"Sync note\n"}]'::jsonb,
+  public.appflowy_document_from_plain_text('Sync note'),
   'Sync note',
   'task',
   'cccccccc-2222-0000-0000-000000000001',
@@ -124,6 +124,89 @@ SELECT is(
   'get_sync_changes note payload does not include removed status'
 );
 
+SELECT is(
+  (public.get_sync_changes(NULL)->'note'->0) ? 'content_document',
+  true,
+  'get_sync_changes note payload includes AppFlowy content_document'
+);
+
+SELECT is(
+  (public.get_sync_changes(NULL)->'note'->0) ? 'content_delta',
+  false,
+  'get_sync_changes note payload does not include removed content_delta'
+);
+
+SELECT is(
+  jsonb_array_length(
+    public.push_note_crdt_updates(
+      'dddddddd-2222-0000-0000-000000000001',
+      jsonb_build_array(
+        jsonb_build_object(
+          'device_id', 'device-a',
+          'client_seq', 1,
+          'update_base64', 'dXBkYXRlLTE='
+        )
+      )
+    )
+  ),
+  1,
+  'push_note_crdt_updates accepts owned note updates'
+);
+
+SELECT is(
+  jsonb_array_length(
+    public.push_note_crdt_updates(
+      'dddddddd-2222-0000-0000-000000000001',
+      jsonb_build_array(
+        jsonb_build_object(
+          'device_id', 'device-a',
+          'client_seq', 1,
+          'update_base64', 'dXBkYXRlLTE='
+        )
+      )
+    )
+  ),
+  1,
+  'push_note_crdt_updates is idempotent for duplicate client_seq'
+);
+
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM public.note_crdt_update
+    WHERE note_id = 'dddddddd-2222-0000-0000-000000000001'
+  ),
+  1,
+  'duplicate CRDT update is stored once'
+);
+
+SELECT is(
+  jsonb_array_length(
+    public.get_note_crdt_updates(
+      'dddddddd-2222-0000-0000-000000000001',
+      0
+    )
+  ),
+  1,
+  'get_note_crdt_updates returns note updates after cursor'
+);
+
+SELECT is(
+  public.get_note_snapshot(
+    'dddddddd-2222-0000-0000-000000000001'
+  )->>'plain_text',
+  'Sync note',
+  'get_note_snapshot returns owned note snapshot'
+);
+
+SELECT is(
+  public.get_note_snapshot(
+    'dddddddd-2222-0000-0000-000000000001'
+  ) ? 'crdt_snapshot_update_base64',
+  true,
+  'get_note_snapshot includes CRDT snapshot update'
+);
+
 SET LOCAL request.jwt.claims TO '{"sub":"00000000-2222-0000-0000-000000000002"}';
 
 SELECT is(
@@ -142,6 +225,13 @@ SELECT is(
   jsonb_array_length(public.get_sync_changes(NULL)->'note'),
   0,
   'another user cannot pull notes they do not own'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.get_note_snapshot('dddddddd-2222-0000-0000-000000000001') $$,
+  'P0002',
+  'Note not found',
+  'another user cannot read note snapshot'
 );
 
 SELECT * FROM finish();

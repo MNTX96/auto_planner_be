@@ -1,9 +1,9 @@
 import { getSupabaseClient } from '../_shared/auth.ts';
-import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
-  normalizeQuillDelta,
-  plainTextFromDelta,
-} from '../_shared/quill_delta.ts';
+  normalizeAppFlowyDocument,
+  plainTextFromDocument,
+} from '../_shared/appflowy_document.ts';
+import { jsonResponse, parseJsonBody, requirePost } from '../_shared/http.ts';
 import {
   formatTimezoneOffset,
   normalizeTimestampToUtcIso,
@@ -228,14 +228,14 @@ async function saveGeneratedPlan(
             return null;
           }
 
-          const contentDelta = normalizeQuillDelta(
+          const contentDocument = normalizeAppFlowyDocument(
             generatedTask.content_detail,
           );
           return {
             user_id: user.id,
             title: task.name ?? '',
-            content_delta: contentDelta,
-            plain_text: plainTextFromDelta(contentDelta),
+            content_document: contentDocument,
+            plain_text: plainTextFromDocument(contentDocument),
             reference_type: 'task',
             reference_id: task.id,
             color: task.color ?? null,
@@ -321,7 +321,7 @@ You MUST strictly obey all constraints provided in the "answers".
           "scheduled_end": "YYYY-MM-DDTHH:mm:ss${timezoneOffset}",
           "duration_minutes": 30,
           "resources_or_location": "What you need or where to go",
-          "content_detail": [{"insert":"Brief instructions or tips for this task\\n"}]
+          "content_detail": {"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Brief instructions or tips for this task"}]}}]}}
         }
       ]
     }
@@ -335,7 +335,7 @@ You MUST strictly obey all constraints provided in the "answers".
 - milestone_index starts at 1, task_index restarts at 1 per milestone.
 - DIRECT LANGUAGE STRICTLY ENFORCED: Write directly to the point. NEVER use third-person narrator phrases. Start goals and tasks directly with action verbs.
 - duration_minutes MUST be a positive integer >= 1. The mathematical difference between scheduled_start and scheduled_end MUST exactly match duration_minutes.
-- NOTE CONTENT: "content_detail" is optional rich text for task notes. It MUST be a Quill Delta JSON ops array, such as [{"insert":"Text\\n"}], and document text must end with a newline.
+- NOTE CONTENT: "content_detail" is optional rich text for task notes. It MUST be an AppFlowy Editor document JSON object, such as {"document":{"type":"page","children":[{"type":"paragraph","data":{"delta":[{"insert":"Text"}]}}]}}.
 - Return ONLY the JSON object.
 
 ### LANGUAGE REQUIREMENT

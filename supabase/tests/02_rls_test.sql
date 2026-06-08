@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(13);
+SELECT no_plan();
 
 -- Setup: create two test users and their profiles
 INSERT INTO auth.users (id, email) VALUES
@@ -30,11 +30,11 @@ VALUES ('cccccccc-0000-0000-0000-000000000001',
         'Task A1',
         '2026-01-01T09:00:00Z');
 
-INSERT INTO note (id, user_id, title, content_delta, plain_text)
+INSERT INTO note (id, user_id, title, content_document, plain_text)
 VALUES ('dddddddd-0000-0000-0000-000000000001',
         '00000000-0000-0000-0000-000000000001',
         'Note A1',
-        '[{"insert":"Note A1\n"}]'::jsonb,
+        public.appflowy_document_from_plain_text('Note A1'),
         'Note A1');
 
 -- ============================================================
@@ -76,8 +76,8 @@ SELECT throws_ok(
 );
 
 SELECT throws_ok(
-  $$ INSERT INTO note (user_id, title, content_delta, plain_text) VALUES
-     ('00000000-0000-0000-0000-000000000001', 'Injected', '[{"insert":"x\n"}]'::jsonb, 'x') $$,
+  $$ INSERT INTO note (user_id, title, content_document, plain_text) VALUES
+     ('00000000-0000-0000-0000-000000000001', 'Injected', public.appflowy_document_from_plain_text('x'), 'x') $$,
   '42501',
   'new row violates row-level security policy for table "note"',
   'User B cannot INSERT note for User A'
