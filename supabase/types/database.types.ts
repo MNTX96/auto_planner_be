@@ -311,11 +311,15 @@ export type Database = {
       note: {
         Row: {
           color: string | null
-          content_delta: Json
+          content_document: Json
+          crdt_snapshot_update_base64: string | null
+          crdt_snapshot_version: number
+          crdt_state_vector_base64: string | null
           created_at: string
           deleted_at: string | null
           deleted_by_device_id: string | null
           id: string
+          last_crdt_server_seq: number
           plain_text: string
           reference_id: string | null
           reference_type:
@@ -328,11 +332,15 @@ export type Database = {
         }
         Insert: {
           color?: string | null
-          content_delta?: Json
+          content_document?: Json
+          crdt_snapshot_update_base64?: string | null
+          crdt_snapshot_version?: number
+          crdt_state_vector_base64?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by_device_id?: string | null
           id?: string
+          last_crdt_server_seq?: number
           plain_text?: string
           reference_id?: string | null
           reference_type?:
@@ -345,11 +353,15 @@ export type Database = {
         }
         Update: {
           color?: string | null
-          content_delta?: Json
+          content_document?: Json
+          crdt_snapshot_update_base64?: string | null
+          crdt_snapshot_version?: number
+          crdt_state_vector_base64?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by_device_id?: string | null
           id?: string
+          last_crdt_server_seq?: number
           plain_text?: string
           reference_id?: string | null
           reference_type?:
@@ -361,6 +373,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      note_crdt_update: {
+        Row: {
+          client_seq: number
+          created_at: string
+          device_id: string
+          id: string
+          note_id: string
+          server_seq: number
+          update_base64: string
+        }
+        Insert: {
+          client_seq: number
+          created_at?: string
+          device_id: string
+          id?: string
+          note_id: string
+          server_seq?: number
+          update_base64: string
+        }
+        Update: {
+          client_seq?: number
+          created_at?: string
+          device_id?: string
+          id?: string
+          note_id?: string
+          server_seq?: number
+          update_base64?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_crdt_update_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "note"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plan: {
         Row: {
@@ -510,18 +560,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      append_plain_text_to_quill_delta: {
-        Args: { p_delta: Json; p_text: string }
+      appflowy_document_from_plain_text: {
+        Args: { p_text: string }
         Returns: Json
       }
+      get_note_crdt_updates: {
+        Args: { p_after_server_seq?: number; p_note_id: string }
+        Returns: Json
+      }
+      get_note_snapshot: { Args: { p_note_id: string }; Returns: Json }
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
       get_sync_changes: { Args: { p_last_synced_at?: string }; Returns: Json }
-      normalize_note_content_delta: {
-        Args: { p_delta: Json; p_fallback_text?: string }
+      normalize_note_content_document: {
+        Args: { p_document: Json; p_fallback_text?: string }
         Returns: Json
       }
-      plain_text_from_quill_delta: { Args: { p_delta: Json }; Returns: string }
-      quill_delta_from_plain_text: { Args: { p_text: string }; Returns: Json }
+      plain_text_from_appflowy_document: {
+        Args: { p_document: Json }
+        Returns: string
+      }
+      push_note_crdt_updates: {
+        Args: { p_note_id: string; p_updates: Json }
+        Returns: Json
+      }
       save_plan_transaction: { Args: { payload: Json }; Returns: string }
       set_user_device_synced: {
         Args: { p_device_id: string; p_last_synced_at: string }

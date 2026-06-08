@@ -2,7 +2,7 @@ BEGIN;
 
 SELECT plan(1);
 
-SELECT is(
+SELECT isnt(
   (
     SELECT COUNT(*)::INTEGER
     FROM pg_proc
@@ -11,7 +11,7 @@ SELECT is(
       AND pg_proc.proname = 'save_plan_transaction'
   ),
   0,
-  'save_plan_transaction RPC has been removed'
+  'save_plan_transaction RPC exists for atomic generated plan saves'
 );
 
 SELECT * FROM finish();
