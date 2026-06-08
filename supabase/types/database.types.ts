@@ -564,11 +564,6 @@ export type Database = {
         Args: { p_text: string }
         Returns: Json
       }
-      get_note_crdt_updates: {
-        Args: { p_after_server_seq?: number; p_note_id: string }
-        Returns: Json
-      }
-      get_note_snapshot: { Args: { p_note_id: string }; Returns: Json }
       get_plan_detail: { Args: { p_plan_id: string }; Returns: Json }
       get_sync_changes: { Args: { p_last_synced_at?: string }; Returns: Json }
       normalize_note_content_document: {
@@ -578,10 +573,6 @@ export type Database = {
       plain_text_from_appflowy_document: {
         Args: { p_document: Json }
         Returns: string
-      }
-      push_note_crdt_updates: {
-        Args: { p_note_id: string; p_updates: Json }
-        Returns: Json
       }
       save_plan_transaction: { Args: { payload: Json }; Returns: string }
       set_user_device_synced: {
