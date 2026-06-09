@@ -190,6 +190,43 @@ SELECT is(
 );
 
 -- ============================================================
+-- Security Advisor: trigger functions pin search_path
+-- ============================================================
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc
+    JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_proc.proname = 'set_updated_at'
+      AND 'search_path=public, pg_temp' = ANY (pg_proc.proconfig)
+  ),
+  'set_updated_at pins search_path'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc
+    JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_proc.proname = 'recalculate_milestone_progress'
+      AND 'search_path=public, pg_temp' = ANY (pg_proc.proconfig)
+  ),
+  'recalculate_milestone_progress pins search_path'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc
+    JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+    WHERE pg_namespace.nspname = 'public'
+      AND pg_proc.proname = 'recalculate_plan_progress'
+      AND 'search_path=public, pg_temp' = ANY (pg_proc.proconfig)
+  ),
+  'recalculate_plan_progress pins search_path'
+);
+
+-- ============================================================
 -- CHECK constraints: progress_percentage is bounded 0-100
 -- ============================================================
 SELECT col_has_check('public', 'plan',      'progress_percentage', 'plan.progress_percentage has CHECK constraint');
